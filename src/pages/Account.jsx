@@ -309,18 +309,6 @@ export default function Account() {
               </div>
             </section>
 
-            {/* ---------------------------------------------------- the plan */}
-            <section style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 18, border: '1px solid rgba(244,236,220,.2)', background: 'rgba(244,236,220,.05)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .3s both' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-                <h2 style={{ ...h2, color: GOLD }}>Free plan</h2>
-                <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.06em', color: 'rgba(244,236,220,.55)' }}>No card on file</span>
-              </div>
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Daily horoscope and one natal chart. Upgrade for year-ahead transits and unlimited synastry.</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                <Link to="/subscription" className="acc-line" style={{ borderBottom: 'none', padding: '9px 18px', border: '1px solid rgba(244,236,220,.45)', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase' }}>See plans</Link>
-              </div>
-            </section>
-
             {/* ------------------------------------------------ the way out */}
             <section style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 6, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .36s both' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
