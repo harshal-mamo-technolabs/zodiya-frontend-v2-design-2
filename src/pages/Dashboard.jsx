@@ -148,7 +148,7 @@ export default function Dashboard() {
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg,rgba(28,37,56,.35) 0%,rgba(28,37,56,.62) 55%,rgba(28,37,56,.82) 100%)' }} />
 
       <header className="om-header" style={{ position: 'relative', width: '100%', maxWidth: 1200, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 0' }}>
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 17, letterSpacing: '.16em', textTransform: 'uppercase', borderBottom: 'none' }}>Meridian</Link>
+        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 17, letterSpacing: '.16em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.5)' }}>{dateLine}</span>
           <NavMenu current="Home" />
@@ -327,7 +327,7 @@ export default function Dashboard() {
               <Link to="/numerology" style={link19}>Numerology <span style={note}>{lifePath != null ? `Life path ${lifePath}` : ''}</span></Link>
             </div>
           </div>
-          <p style={{ margin: 0, maxWidth: '42ch', fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, lineHeight: 1.5, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Year-ahead transits and unlimited synastry are part of Meridian Plus. <Link to="/subscription" style={{ fontFamily: MONO, fontStyle: 'normal', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD, whiteSpace: 'nowrap', borderBottom: 'none' }}>See plans →</Link></p>
+          <p style={{ margin: 0, maxWidth: '42ch', fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, lineHeight: 1.5, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Year-ahead transits and unlimited synastry are part of AstroMeridian Plus. <Link to="/subscription" style={{ fontFamily: MONO, fontStyle: 'normal', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD, whiteSpace: 'nowrap', borderBottom: 'none' }}>See plans →</Link></p>
         </section>
 
         <span className="om-foot" style={{ gridArea: 'foot', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.35)', lineHeight: 1.8 }}>Sky as seen from {latText(profile.lat)} · sidereal time {siderealTime(now, profile.lon)}</span>

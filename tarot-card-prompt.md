@@ -1,5 +1,5 @@
 # Tarot card image prompts
-Prompts for all 78 cards of the Meridian tarot deck, one image each. Every prompt is `STYLE + SUBJECT`, so generate them all with the same style block and the deck reads as one set.
+Prompts for all 78 cards of the AstroMeridian tarot deck, one image each. Every prompt is `STYLE + SUBJECT`, so generate them all with the same style block and the deck reads as one set.
 ## Where the images go
 | | |
 |---|---|

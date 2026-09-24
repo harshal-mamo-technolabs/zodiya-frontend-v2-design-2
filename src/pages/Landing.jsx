@@ -98,7 +98,7 @@ export default function Landing() {
 
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-          <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 22, letterSpacing: '.14em', textTransform: 'uppercase' }}>Meridian</span>
+          <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 22, letterSpacing: '.14em', textTransform: 'uppercase' }}>AstroMeridian</span>
           <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', color: MUTED, textTransform: 'uppercase' }}>Natal Atlas</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -177,7 +177,7 @@ export default function Landing() {
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 28 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '24px 40px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 300 }}>
-              <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 20, letterSpacing: '.14em', textTransform: 'uppercase' }}>Meridian</span>
+              <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 20, letterSpacing: '.14em', textTransform: 'uppercase' }}>AstroMeridian</span>
               <span style={{ fontSize: 13, lineHeight: 1.5, color: 'rgba(28,37,56,.7)' }}>Planetary positions computed to the arc-minute. Written by people, checked against the ephemeris.</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(120px,auto))', gap: '10px 40px', fontSize: 13 }}>
@@ -187,7 +187,7 @@ export default function Landing() {
             </div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '8px 20px', borderTop: '1px solid rgba(28,37,56,.2)', paddingTop: 16, fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(28,37,56,.6)' }}>
-            <span>© MMXXVI Meridian</span>
+            <span>© MMXXVI AstroMeridian</span>
             <span>For reflection, not prediction</span>
           </div>
         </div>

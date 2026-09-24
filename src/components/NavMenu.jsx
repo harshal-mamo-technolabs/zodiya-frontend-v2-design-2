@@ -110,7 +110,7 @@ export default function NavMenu({ current = '' }) {
         <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(10,14,24,.72)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end', animation: 'om-nav-fade .2s ease both' }}>
           <nav onClick={stop} style={{ width: 'min(320px,84vw)', height: '100%', background: '#1C2538', borderLeft: '1px solid rgba(244,236,220,.2)', boxShadow: '-24px 0 50px rgba(0,0,0,.4)', display: 'flex', flexDirection: 'column', padding: 0, overflowY: 'auto', animation: 'om-nav-slide .28s cubic-bezier(.3,0,.2,1) both' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid rgba(244,236,220,.16)' }}>
-              <Link to="/" onClick={() => setOpen(false)} style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontWeight: 600, fontSize: 16, letterSpacing: '.14em', textTransform: 'uppercase', color: '#F4ECDC', borderBottom: 'none' }}>Meridian</Link>
+              <Link to="/" onClick={() => setOpen(false)} style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontWeight: 600, fontSize: 16, letterSpacing: '.14em', textTransform: 'uppercase', color: '#F4ECDC', borderBottom: 'none' }}>AstroMeridian</Link>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" style={{ width: 28, height: 28, background: 'transparent', border: 'none', color: '#F4ECDC', fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: 0 }}>×</button>
             </div>
             {GROUPS.map(g => (

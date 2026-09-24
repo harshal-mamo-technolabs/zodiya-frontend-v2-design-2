@@ -168,7 +168,7 @@ function ChartView({ chart, shared }) {
         {shared
           ? <Link to="/signup" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>Draw your own →</Link>
           : <Link to="/birth-details" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>← Edit entry</Link>}
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>Meridian</Link>
+        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         {/* the public view has no menu; the empty box keeps the wordmark centred */}
         <div style={{ display: 'flex', alignItems: 'center', minWidth: 34 }}>
           {!shared && <NavMenu current="Natal Chart" />}

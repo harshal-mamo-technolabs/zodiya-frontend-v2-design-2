@@ -53,7 +53,7 @@ export default function SignIn({ mode }) {
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><Starfield auth /></div>
 
       <div style={{ position: 'absolute', top: 22, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-        <Link to="/" style={{ pointerEvents: 'auto', fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.16em', textTransform: 'uppercase', color: '#F4ECDC', borderBottom: 'none' }}>Meridian</Link>
+        <Link to="/" style={{ pointerEvents: 'auto', fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.16em', textTransform: 'uppercase', color: '#F4ECDC', borderBottom: 'none' }}>AstroMeridian</Link>
       </div>
 
       <div className="auth-card" style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'rgba(244,236,220,.94)', border: '1px solid rgba(244,236,220,.5)', boxShadow: '0 30px 60px rgba(0,0,0,.35)', backdropFilter: 'blur(6px)', padding: '26px 24px 24px', display: 'flex', flexDirection: 'column', gap: 20, animation: 'om-rise .5s cubic-bezier(.3,0,.2,1) .2s both' }}>
