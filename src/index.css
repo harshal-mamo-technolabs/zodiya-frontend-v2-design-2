@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #1C2538;
+  --color-cream: #F4ECDC;
+  --color-sage: #5F8B7A;
+  --color-gold: #B4933F;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Instrument Sans', Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+/* Base — lifted from the design's <helmet> styles */
+html, body { margin: 0; padding: 0; background: #1C2538; color: #F4ECDC; font-family: 'Instrument Sans', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+a { color: #F4ECDC; text-decoration: none; border-bottom: 1px solid rgba(244,236,220,.35); }
+a:hover { color: #5F8B7A; border-bottom-color: #5F8B7A; }
+input { font: inherit; color: inherit; }
+input::placeholder { color: rgba(244,236,220,.35); }
+input:focus { outline: none; }
+
+/* Sign-in card is cream-on-ink, so links + placeholders invert inside it */
+.auth-card { color: #1C2538; }
+.auth-card a { color: #1C2538; border-bottom: 1px solid rgba(28,37,56,.35); }
+.auth-card a:hover { color: #5F8B7A; border-bottom-color: #5F8B7A; }
+.auth-card input::placeholder { color: rgba(28,37,56,.35); }
+
+/* style-hover equivalents */
+.hov-ink:hover { background: #2A3550; }
+.hov-cream:hover { background: #E6DCC6; }
+.hov-sage:hover { color: #5F8B7A; }
+.hov-cream-text:hover { color: #F4ECDC; }
+.hov-wash:hover { background: rgba(244,236,220,.14); }
+.hov-wash-cream:hover { background: rgba(244,236,220,.14); color: #F4ECDC; }
+.hov-wash-10:hover { background: rgba(244,236,220,.1); }
+.hov-wash-20:hover { background: rgba(244,236,220,.2); }
+
+@keyframes om-turn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes om-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes om-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes om-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes om-settle { from { opacity: 0; transform: rotate(-9deg); } to { opacity: 1; transform: rotate(0deg); } }
+@keyframes om-glow { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+@keyframes om-nav-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes om-nav-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* ── Print: "Download as plate" is window.print(), so this IS the PDF ──
+   The page uses inline styles throughout, which beat stylesheet rules — hence
+   !important on anything that has to be overridden for paper. */
+@media print {
+  @page { margin: 12mm; }
+
+  html, body { background: #fff !important; }
+
+  /* the page root paints the ink ground inline; paper needs white under the
+     dark ink text, or pages two onward come out invisible */
+  .chart-root {
+    background: #fff !important;
+    color: #1C2538 !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* decorative layers and anything you cannot click on paper */
+  .starfield-layer, .print-hide { display: none !important; }
+
+  /* a half-finished draw animation would be frozen into the PDF */
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+
+  /* collapsibles open on paper no matter what the reader left open on screen */
+  .reading-body { display: flex !important; }
+  .table-body { display: block !important; overflow: visible !important; }
+
+  /* page one: the plate keeps the ink ground and bleeds to the sheet edge */
+  .print-plate {
+    background: #1C2538 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    break-after: page;
+    padding: 8mm 10mm 14mm !important;
+    margin: -12mm -12mm 0 !important;
+  }
+
+  /* the reading and the placements print as ink on white */
+  .print-reading, .print-reading *,
+  .print-table, .print-table * {
+    color: #1C2538 !important;
+    background: transparent !important;
+    border-color: rgba(28, 37, 56, .28) !important;
+  }
+  .print-reading { padding-top: 0 !important; }
+  .print-reading .reading-basis { border-left-color: #B4933F !important; }
+  .print-reading > div, .print-table tr { break-inside: avoid; }
+  .print-table { break-inside: avoid; }
+}
