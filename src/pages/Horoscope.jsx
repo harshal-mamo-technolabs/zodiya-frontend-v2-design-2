@@ -127,7 +127,7 @@ export default function Horoscope() {
             {SIGNS.map(s => {
               const active = s === sign;
               return (
-                <button key={s} type="button" onClick={() => setSign(s)} title={s.charAt(0).toUpperCase() + s.slice(1)} aria-pressed={active} className={active ? '' : 'hor-sign'} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, aspectRatio: '1 / 1', maxHeight: 96, background: active ? INK : 'transparent', border: 'none', borderRight: '1px solid rgba(244,236,220,.2)', borderBottom: '1px solid rgba(244,236,220,.2)', cursor: 'pointer', padding: '6px 2px' }}>
+                <button key={s} type="button" onClick={() => setSign(s)} title={s.charAt(0).toUpperCase() + s.slice(1)} aria-pressed={active} className={active ? '' : 'hor-sign'} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, aspectRatio: '1 / 1', background: active ? INK : 'transparent', border: 'none', borderRight: '1px solid rgba(244,236,220,.2)', borderBottom: '1px solid rgba(244,236,220,.2)', cursor: 'pointer', padding: '6px 2px' }}>
                   <span style={{ width: '100%', maxWidth: 30, display: 'block' }}><Glyph sign={s} active={active} /></span>
                   <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: '.1em', textTransform: 'uppercase', color: active ? 'rgba(28,37,56,.8)' : MUTED }}>{ABBR[s]}</span>
                 </button>
