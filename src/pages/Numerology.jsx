@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
-import { listProfiles, numerology, saveBirthName } from '../lib/api.js';
-import { checkDate, formatDate, isoToInput } from '../lib/date-input.js';
+import { listProfiles, numerology } from '../lib/api.js';
+import { checkDate, isoToInput } from '../lib/date-input.js';
+import { readActive } from '../lib/active-profile.js';
 
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',Georgia,serif";
@@ -13,7 +14,6 @@ const COP = '#5F8B7A', GOLD = '#B4933F', LIT = '#E2C97F';
 const HAIR = '1px solid rgba(244,236,220,.16)';
 
 const lbl = { fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED };
-const bigInput = { width: '100%', boxSizing: 'border-box', border: 'none', borderBottom: '1px solid rgba(244,236,220,.25)', background: 'transparent', padding: '6px 0', fontFamily: SERIF, fontSize: 24, lineHeight: 1.2, color: CREAM };
 const card = { display: 'flex', flexDirection: 'column', gap: 22, padding: '24px 22px', border: HAIR, background: 'rgba(244,236,220,.03)' };
 const mathBox = { display: 'flex', flexDirection: 'column', gap: 4, fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: 'rgba(244,236,220,.6)', wordBreak: 'break-word', padding: '10px 12px', background: 'rgba(244,236,220,.05)' };
 const body = { fontSize: 16, lineHeight: 1.66, color: CREAM, textWrap: 'pretty' };
@@ -41,70 +41,30 @@ export default function Numerology() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [dob, setDob] = useState('');
-  const [profileId, setProfileId] = useState(null);
-  const [savedName, setSavedName] = useState('');
-  const [saveState, setSaveState] = useState('idle');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const [ready, setReady] = useState(false);
-  const seq = useRef(0);
 
-  /* Prefill from the active profile: the same two facts we already hold. */
+  /* Name and birth date come from the active profile; switch profiles from the menu. */
   useEffect(() => {
     let live = true;
     listProfiles()
       .then(profiles => {
-        if (!live || !profiles.length) { setReady(true); return; }
-        let wanted = null;
-        try { wanted = localStorage.getItem('meridian_active_profile'); } catch (e) {}
+        if (!profiles.length) { navigate('/birth-details'); return null; }
+        const wanted = readActive();
         const p = profiles.find(x => x._id === wanted) || profiles.find(x => x.isPrimary) || profiles[0];
-        setName(p.birthName || `${p.firstName} ${p.lastName}`);
-        setSavedName(p.birthName || '');
-        setProfileId(p._id);
-        setDob(isoToInput(p.birthDate));
-        setReady(true);
+        const full = (p.birthName || `${p.firstName} ${p.lastName}`).trim();
+        const input = isoToInput(p.birthDate);
+        if (live) { setName(full); setDob(input); }
+        return numerology({ name: full, birthDate: checkDate(input).iso });
       })
+      .then(data => { if (live && data) setResult(data); })
       .catch(e => {
         if (e.status === 401) { navigate('/login'); return; }
-        if (live) setReady(true);
+        if (live) setError(e.message);
       });
     return () => { live = false; };
   }, [navigate]);
 
-  /* Debounced so "updates as you type" does not mean a request per keystroke. */
-  useEffect(() => {
-    if (!ready) return;
-    const iso = checkDate(dob).iso;
-    const trimmed = name.trim();
-    if (!trimmed || !/[A-Za-z]/.test(trimmed) || !iso) { setResult(null); setError(''); return; }
-
-    const mine = ++seq.current;
-    const timer = setTimeout(() => {
-      numerology({ name: trimmed, birthDate: iso })
-        .then(data => { if (mine === seq.current) { setResult(data); setError(''); } })
-        .catch(e => {
-          if (e.status === 401) { navigate('/login'); return; }
-          if (mine === seq.current) { setResult(null); setError(e.message); }
-        });
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [name, dob, ready, navigate]);
-
-  const save = () => {
-    if (!profileId) return;
-    setSaveState('saving');
-    saveBirthName(profileId, name.trim())
-      .then(() => { setSavedName(name.trim()); setSaveState('saved'); })
-      .catch(e => {
-        if (e.status === 401) { navigate('/login'); return; }
-        setSaveState('idle');
-        setError(e.message);
-      });
-  };
-
-  const dateError = checkDate(dob).error;
-  const dirty = Boolean(profileId && name.trim() && name.trim() !== savedName);
   const s = result?.sections;
 
   return (
@@ -127,18 +87,19 @@ export default function Numerology() {
             <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,5vw,44px)', lineHeight: 1.06, textWrap: 'balance' }}>Two facts. Five numbers.</h1>
           </div>
 
-          <div style={card}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={lbl}>Full name at birth</span>
-              <input type="text" value={name} onChange={e => { setName(e.target.value); setSaveState('idle'); }} placeholder="As on your birth certificate" style={bigInput} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={lbl}>Date of birth</span>
-              <input type="text" inputMode="numeric" value={dob} onChange={e => setDob(formatDate(e.target.value))} placeholder="DD / MM / YYYY" style={{ ...bigInput, fontFamily: MONO, fontSize: 20, letterSpacing: '.06em' }} />
-              {dateError && <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.08em', color: GOLD }}>{dateError}</span>}
-            </label>
-            <span style={{ fontSize: 12.5, lineHeight: 1.5, color: MUTED }}>Pythagorean system. Results update as you type, and the working is shown for every number.</span>
-          </div>
+          {name && (
+            <div style={{ ...card, gap: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={lbl}>Full name at birth</span>
+                <span style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.2 }}>{name}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={lbl}>Date of birth</span>
+                <span style={{ fontFamily: MONO, fontSize: 20, letterSpacing: '.06em' }}>{dob}</span>
+              </div>
+              <span style={{ fontSize: 12.5, lineHeight: 1.5, color: MUTED }}>From your active profile. Switch profiles from the menu. Pythagorean system, with the working shown for every number.</span>
+            </div>
+          )}
 
           {error && (
             <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14, lineHeight: 1.45 }}>{error}</div>
@@ -178,16 +139,6 @@ export default function Numerology() {
                 </div>
               </div>
 
-              {profileId && (
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={!dirty || saveState === 'saving'}
-                  style={{ height: 50, border: 'none', background: dirty ? GOLD : 'rgba(244,236,220,.08)', color: dirty ? '#14182A' : MUTED, fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', cursor: dirty ? 'pointer' : 'default' }}
-                >
-                  {saveState === 'saving' ? 'Saving…' : saveState === 'saved' && !dirty ? 'Saved to your profile' : 'Save to my profile'}
-                </button>
-              )}
             </>
           )}
         </div>
@@ -198,7 +149,7 @@ export default function Numerology() {
 
           {!result && (
             <div style={{ padding: '40px 0', fontFamily: SERIF, fontSize: 21, color: MUTED, lineHeight: 1.4 }}>
-              {ready ? 'Enter a full name and a date of birth to see the five numbers.' : 'Loading your details…'}
+              {error ? '' : 'Loading your numbers…'}
             </div>
           )}
 
