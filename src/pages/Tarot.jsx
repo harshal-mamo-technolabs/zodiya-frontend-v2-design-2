@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
 import { drawTarot } from '../lib/api.js';
+import { registerPage } from '../lib/pageActions.js';
 import { tarotImage } from '../lib/assets.js';
 
 const MONO = "'IBM Plex Mono',monospace";
@@ -62,18 +63,49 @@ export default function Tarot() {
   const [revealed, setRevealed] = useState([]);
   const [error, setError] = useState('');
 
+  // the astrologer reads these between renders
+  const drawRef = useRef(null), revealedRef = useRef([]), spreadRef = useRef(spread);
+  drawRef.current = draw; revealedRef.current = revealed; spreadRef.current = spread;
+
+  const seq = useRef(0); // only the latest draw lands, so an older one can't overwrite it
   const shuffle = useCallback(kind => {
-    setRevealed([]);
+    const n = ++seq.current;
+    setRevealed([]); revealedRef.current = [];
     setError('');
-    drawTarot(kind)
-      .then(setDraw)
+    return drawTarot(kind)
+      .then(d => { if (n !== seq.current) return null; drawRef.current = d; setDraw(d); return d; })
       .catch(e => {
-        if (e.status === 401) { navigate('/login'); return; }
+        if (e.status === 401) { navigate('/login'); return null; }
         setError(e.message);
+        return null;
       });
   }, [navigate]);
 
-  useEffect(() => { shuffle(spread); }, [spread, shuffle]);
+  const pick = useCallback(kind => { setSpread(kind); spreadRef.current = kind; return shuffle(kind); }, [shuffle]);
+
+  useEffect(() => { shuffle(spreadRef.current); }, [shuffle]);
+
+  /* Voice commands from the astrologer: draw a spread, turn cards. Each answer
+     says what is now on screen, so the agent reads the real cards. */
+  useEffect(() => registerPage('tarot', async ({ action, spread: kind, card }) => {
+    if (action === 'draw') {
+      const k = ['single', 'three', 'yesNo'].includes(kind) ? kind : spreadRef.current;
+      const d = await pick(k);
+      if (!d) return 'The draw failed. Nothing is on screen.';
+      return `Laid out a new ${k} spread, face down: ${d.cards.map((c, i) => `card ${i + 1}${c.position ? ` (${c.position})` : ''}`).join(', ')}.`;
+    }
+    const d = drawRef.current;
+    if (!d) return 'No spread is laid out yet.';
+    const down = d.cards.map((_, i) => i).filter(i => !revealedRef.current.includes(i));
+    const idx = card === 'all' ? down : card ? [Number(card) - 1] : down.slice(0, 1);
+    const turn = idx.filter(i => d.cards[i]);
+    if (!turn.length) return card ? `There is no card ${card}.` : 'Every card is already turned.';
+    revealedRef.current = [...new Set([...revealedRef.current, ...turn])];
+    setRevealed(revealedRef.current);
+    const lines = turn.map(i => { const c = d.cards[i]; return `${c.position || 'Card'}: ${c.name}, ${c.orientation}. ${c.lede} ${c.text}`; });
+    if (d.verdict && turn.includes(0)) lines.push(`The answer: ${d.verdict.title}. ${d.verdict.line}`);
+    return lines.join('\n');
+  }), [pick]);
 
   const cards = draw?.cards ?? [];
   const shown = cards.filter((_, i) => revealed.includes(i));
@@ -101,7 +133,7 @@ export default function Tarot() {
 
           <div role="tablist" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 4, padding: 4, border: HAIR, background: 'rgba(244,236,220,.03)', width: '100%', maxWidth: 420, marginTop: 12 }}>
             {(draw?.spreads ?? [{ key: 'single', label: 'Single card' }, { key: 'three', label: 'Three cards' }, { key: 'yesNo', label: 'Yes / no' }]).map(s => (
-              <button key={s.key} type="button" role="tab" aria-selected={spread === s.key} onClick={() => setSpread(s.key)} style={{ padding: '12px 4px', border: 'none', cursor: 'pointer', background: spread === s.key ? 'rgba(180,147,63,.16)' : 'transparent', color: spread === s.key ? LIT : MUTED, fontFamily: MONO, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase' }}>{s.label}</button>
+              <button key={s.key} type="button" role="tab" aria-selected={spread === s.key} onClick={() => pick(s.key)} style={{ padding: '12px 4px', border: 'none', cursor: 'pointer', background: spread === s.key ? 'rgba(180,147,63,.16)' : 'transparent', color: spread === s.key ? LIT : MUTED, fontFamily: MONO, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase' }}>{s.label}</button>
             ))}
           </div>
         </div>

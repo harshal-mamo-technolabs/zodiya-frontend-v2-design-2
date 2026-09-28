@@ -10,7 +10,7 @@ const GROUPS = [
   { label: 'Today', items: [['Home', '/dashboard'], ['Daily Horoscope', '/daily-horoscope']] },
   { label: 'Your chart', items: [['Birth Details', '/birth-details'], ['Natal Chart', '/natal-chart'], ['Transits', '/transits']] },
   { label: 'Practices', items: [['Synastry', '/synastry'], ['Tarot', '/tarot'], ['Numerology', '/numerology']] },
-  { label: 'You', items: [['Account', '/account']] }
+  { label: 'You', items: [['Your astrologer', '/choose-astrologer'], ['Account', '/account']] }
 ];
 
 const MONO = "'IBM Plex Mono',monospace";

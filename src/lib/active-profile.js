@@ -3,5 +3,9 @@
 const KEY = 'meridian_active_profile';
 
 export const readActive = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
-export const writeActive = id => { try { localStorage.setItem(KEY, id); } catch (e) {} };
+export const writeActive = id => {
+  try { localStorage.setItem(KEY, id); } catch (e) {}
+  // the app re-renders its pages for the new profile without a reload
+  window.dispatchEvent(new CustomEvent('meridian:active-profile', { detail: id }));
+};
 export const clearActive = () => { try { localStorage.removeItem(KEY); } catch (e) {} };

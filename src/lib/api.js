@@ -86,3 +86,6 @@ export const drawTarot = (spread, lang = 'en') => call(`/tarot/draw?lang=${lang}
 
 export const searchPlaces = (q, signal) => call(`/places?q=${encodeURIComponent(q)}`, { signal });
 export const placeDetails = placeId => call(`/places/${encodeURIComponent(placeId)}`);
+
+export const astrologerPreview = id => call(`/astrologer/characters/${id}/preview`);
+export const astrologerSession = body => call('/astrologer/session', { method: 'POST', body });

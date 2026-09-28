@@ -44,6 +44,15 @@ input:focus { outline: none; }
 @keyframes om-nav-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes om-nav-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
+/* AI astrologer widget */
+@keyframes astro-pulse { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.55); opacity: 0; } }
+@keyframes astro-wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+@keyframes astro-spin { to { transform: rotate(360deg); } }
+@keyframes astro-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.astro-hov:hover { color: #EFEAE0 !important; border-color: rgba(239,234,224,.4) !important; }
+.astro-chip:hover { background: rgba(212,178,106,.14) !important; }
+.astro-focus:focus-visible { outline: 2px solid #EBD39A; outline-offset: 2px; }
+
 /* ── Print: "Download as plate" is window.print(), so this IS the PDF ──
    The page uses inline styles throughout, which beat stylesheet rules — hence
    !important on anything that has to be overridden for paper. */
@@ -92,4 +101,22 @@ input:focus { outline: none; }
   .print-reading .reading-basis { border-left-color: #B4933F !important; }
   .print-reading > div, .print-table tr { break-inside: avoid; }
   .print-table { break-inside: avoid; }
+}
+
+/* Choose astrologer: a snap carousel on phones, a grid from tablet up */
+.ca-shell { container-type: inline-size; width: 100%; }
+.ca-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 14px; padding: 6px 22px 18px; scrollbar-width: none; }
+.ca-grid > * { flex: 0 0 78%; scroll-snap-align: center; }
+.ca-prefs { grid-template-columns: minmax(0,1fr); }
+.ca-card:focus-visible { outline: 2px solid #D8BC6A; outline-offset: 3px; }
+@container (min-width: 820px) {
+  .ca-grid { display: grid; overflow: visible; grid-template-columns: repeat(4,minmax(0,1fr)); padding: 6px 48px 18px; gap: 16px; }
+}
+@container (min-width: 1240px) {
+  .ca-grid { grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .ca-grid > * { flex: none; }
+  .ca-pad { padding-left: 48px !important; padding-right: 48px !important; }
+  .ca-h1 { font-size: 60px !important; }
+  .ca-prefs { grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 56px !important; }
+  .ca-bar { left: 50% !important; right: auto !important; transform: translateX(-50%); bottom: 24px !important; width: min(640px,calc(100% - 96px)) !important; }
 }

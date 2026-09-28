@@ -151,7 +151,7 @@ const KIND_COLOR = { tense: COP, flow: GOLD, conjunction: MUTED };
 
 export default function Synastry() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [stage, setStage] = useState('form');
   const [profiles, setProfiles] = useState([]);
   const [slotA, setSlotA] = useState(null);
@@ -176,9 +176,20 @@ export default function Synastry() {
     return () => { live = false; };
   }, [navigate]);
 
+  // the astrologer can pick person two while this page is already open
+  const withId = params.get('with');
+  useEffect(() => { if (withId) { setSlotB(withId); setStage('form'); } }, [withId]);
+
   const pa = profiles.find(p => p._id === slotA) || null;
   const pb = profiles.find(p => p._id === slotB) || null;
   const ready = !!(pa && pb) && slotA !== slotB;
+
+  // go=1: the astrologer asked for this pair, so compare straight away (once)
+  useEffect(() => {
+    if (params.get('go') !== '1' || !ready) return;
+    setParams(p => { p.delete('go'); return p; }, { replace: true });
+    submit();
+  }, [params, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async () => {
     if (!ready || busy) return;

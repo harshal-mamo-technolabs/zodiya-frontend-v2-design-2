@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { getMe } from './lib/api.js';
+import { readActive } from './lib/active-profile.js';
 import SignIn from './pages/SignIn.jsx';
 import BirthDetails from './pages/BirthDetails.jsx';
 import NatalChart, { SharedChart } from './pages/NatalChart.jsx';
@@ -12,6 +13,8 @@ import Landing from './pages/Landing.jsx';
 import Synastry from './pages/Synastry.jsx';
 import Horoscope from './pages/Horoscope.jsx';
 import Account from './pages/Account.jsx';
+import ChooseAstrologer from './pages/ChooseAstrologer.jsx';
+import AstrologerWidget from './components/AstrologerWidget.jsx';
 
 /* The landing for visitors; anyone with a session goes straight to the dashboard. */
 function Home() {
@@ -26,8 +29,17 @@ function Home() {
 }
 
 export default function App() {
+  // a profile switch remounts every page, so each reads the new active profile
+  const [active, setActive] = useState(readActive);
+  useEffect(() => {
+    const on = e => setActive(e.detail);
+    window.addEventListener('meridian:active-profile', on);
+    return () => window.removeEventListener('meridian:active-profile', on);
+  }, []);
+
   return (
-    <Routes>
+    <>
+    <Routes key={active || 'none'}>
       <Route path="/" element={<Home />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/welcome" element={<Navigate to="/" replace />} />
@@ -42,7 +54,11 @@ export default function App() {
       <Route path="/synastry" element={<Synastry />} />
       <Route path="/daily-horoscope" element={<Horoscope />} />
       <Route path="/account" element={<Account />} />
+      <Route path="/choose-astrologer" element={<ChooseAstrologer />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    {/* follows the reader across every signed-in page */}
+    <AstrologerWidget />
+    </>
   );
 }
