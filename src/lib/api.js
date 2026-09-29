@@ -8,8 +8,13 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
     this.errors = errors || [];
+    // plan_required, profile_slot_required, minutes_exhausted
+    this.code = (this.errors[0] && this.errors[0].code) || null;
   }
 }
+
+/* Pages a lapsed account may still open; anything else is sent to pricing. */
+const OPEN_PAGES = ['/', '/login', '/signup', '/subscription', '/checkout', '/billing', '/account'];
 
 /** The API reports both validation and thrown errors as { errors: [{ msg }] }. */
 function messageFrom(data, status) {
@@ -55,7 +60,14 @@ async function call(path, { method = 'GET', body, signal, retried = false } = {}
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
 
-  if (!res.ok) throw new ApiError(res.status, messageFrom(data, res.status), data && data.errors);
+  if (!res.ok) {
+    const err = new ApiError(res.status, messageFrom(data, res.status), data && data.errors);
+    // the plan lapsed while the page was open: the only way forward is a plan
+    if (err.code === 'plan_required' && !OPEN_PAGES.includes(window.location.pathname)) {
+      window.location.assign('/subscription');
+    }
+    throw err;
+  }
   return data;
 }
 
@@ -89,3 +101,19 @@ export const placeDetails = placeId => call(`/places/${encodeURIComponent(placeI
 
 export const astrologerPreview = id => call(`/astrologer/characters/${id}/preview`);
 export const astrologerSession = body => call('/astrologer/session', { method: 'POST', body });
+export const endAstrologerSession = id => call(`/astrologer/session/${id}/end`, { method: 'POST' });
+
+export const billingCatalog = () => call('/billing/catalog');
+export const billingStatus = () => call('/billing/status');
+export const billingSync = paymentIntentId => call('/billing/sync', { method: 'POST', body: paymentIntentId ? { paymentIntentId } : {} });
+export const subscribe = (plan, trial = false) => call('/billing/subscribe', { method: 'POST', body: { plan, trial } });
+export const changePlan = plan => call('/billing/plan/change', { method: 'POST', body: { plan } });
+export const cancelPlan = () => call('/billing/plan/cancel', { method: 'POST' });
+export const resumePlan = () => call('/billing/plan/resume', { method: 'POST' });
+export const addProfileSlot = () => call('/billing/profiles', { method: 'POST' });
+export const buyMinutes = (pack, quantity = 1) => call('/billing/minutes', { method: 'POST', body: { pack, quantity } });
+export const payOpenInvoice = kind => call('/billing/pay-open', { method: 'POST', body: { kind } });
+export const getCard = () => call('/billing/card');
+export const startCardSetup = () => call('/billing/card', { method: 'POST' });
+export const saveCard = setupIntentId => call('/billing/card', { method: 'PUT', body: { setupIntentId } });
+export const listInvoices = () => call('/billing/invoices');

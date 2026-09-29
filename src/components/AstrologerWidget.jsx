@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../lib/mrd-astro.js';
 import { listProfiles } from '../lib/api.js';
+import { getStatus } from '../lib/billing.js';
 import { readActive } from '../lib/active-profile.js';
 import { READINGS, SUB_PX, byId, getPrefs, setPrefs } from '../lib/astrologers.js';
 import { useAstrologer } from '../lib/useAstrologer.js';
@@ -10,7 +11,7 @@ import { useAstrologer } from '../lib/useAstrologer.js';
    figure that snaps to either edge, steps out of the way of buttons, and
    opens into a chat panel. Ported from the design's Astrologer Widget. */
 
-const HIDDEN_ON = [/^\/$/, /^\/login/, /^\/signup/, /^\/chart\//];
+const HIDDEN_ON = [/^\/$/, /^\/login/, /^\/signup/, /^\/chart\//, /^\/subscription/, /^\/checkout/];
 const SANS = "'DM Sans',system-ui,sans-serif";
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',serif";
@@ -21,8 +22,12 @@ const ERR = {
   unsupported: ['Voice input unavailable', "This browser can't use the microphone here. Type your question and I'll still answer."],
   offline: ['Connection lost', "I've lost the stars for a moment. Check your connection and try again."],
   nospeech: ["I didn't catch that", 'Try again a little closer to the mic, or type your question.'],
-  setup: ['Not ready yet', 'Your astrologer is still being set up. Please try again in a little while.']
+  setup: ['Not ready yet', 'Your astrologer is still being set up. Please try again in a little while.'],
+  minutes: ['Out of minutes', "You've used all your astrologer minutes. Top up to keep talking, or wait for your plan to renew."],
+  plan: ['Plan needed', 'Talking with your astrologer needs an active plan.']
 };
+// these errors are fixed on the billing page, not by trying again
+const PAID_FIX = { minutes: ['Top up minutes', '/billing'], plan: ['See plans', '/subscription'] };
 const STATE_UI = { idle: ['Ready', '#D4B26A'], listening: ['Listening', '#7FD4C8'], connecting: ['Connecting', '#7FD4C8'], thinking: ['Thinking', '#C9BCF0'], speaking: ['Speaking', '#EBD39A'], error: ['Needs attention', '#EBA0A0'] };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const px = n => Math.round(n) + 'px';
@@ -104,12 +109,13 @@ export default function AstrologerWidget() {
   useEffect(() => {
     if (!onPage) return;
     let live = true;
-    listProfiles()
-      .then(list => {
+    // only a paying account gets the astrologer
+    Promise.all([listProfiles(), getStatus()])
+      .then(([list, status]) => {
         if (!live) return;
         const wanted = readActive();
         const p = list.find(x => x._id === wanted) || list.find(x => x.isPrimary) || list[0];
-        setSignedIn(true); setProfileId(p ? p._id : null);
+        setSignedIn(status.entitled); setProfileId(p ? p._id : null);
       })
       .catch(() => { if (live) setSignedIn(false); });
     return () => { live = false; };
@@ -383,12 +389,16 @@ export default function AstrologerWidget() {
                   </div>
                   {showWords && <Captions caption={caption} compact={compact} size={subPx} />}
                   {!showWords && cardText && <div style={{ font: `400 ${subPx}/1.45 ${SANS}`, color: cardTextColor, textWrap: 'pretty' }}>{cardText}</div>}
-                  {aState === 'error' && (
+                  {aState === 'error' && (PAID_FIX[err] ? (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Link to={PAID_FIX[err][1]} onClick={astro.reset} className="astro-focus" style={pill({ border: 0, background: GOLD, color: '#07091A', borderBottom: 'none' })}>{PAID_FIX[err][0]}</Link>
+                    </div>
+                  ) : (
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <button type="button" className="astro-focus" onClick={typeInstead} style={pill({ border: 0, background: GOLD, color: '#07091A' })}>Type instead</button>
                       <button type="button" className="astro-focus" onClick={retry} style={pill()}>Try again</button>
                     </div>
-                  )}
+                  ))}
                   {busy && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button type="button" className="astro-focus" onClick={astro.stop} aria-label="Stop speaking" style={pill({ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', font: `400 12px ${SANS}`, border: '1px solid rgba(239,234,224,.2)' })}><Icon d={['M5 5h14v14H5z']} size={12} fill />Stop</button>
@@ -463,7 +473,9 @@ export default function AstrologerWidget() {
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateColor, boxShadow: `0 0 8px ${stateColor}` }} />{stateLabel}{cardAnim}
                       </div>
                       {showWords ? <Captions caption={caption} compact={compact} size={subPx} /> : stageText && <div style={{ font: `400 14px/1.5 ${SANS}`, color: aState === 'idle' ? SOFT : cardTextColor, textWrap: 'pretty' }}>{stageText}</div>}
-                      {aState === 'error' && <div style={{ display: 'flex', gap: 8 }}><button type="button" className="astro-focus" onClick={retry} style={pill({ padding: '6px 12px', font: `500 12px ${SANS}` })}>Try again</button></div>}
+                      {aState === 'error' && <div style={{ display: 'flex', gap: 8 }}>{PAID_FIX[err]
+                        ? <Link to={PAID_FIX[err][1]} onClick={astro.reset} className="astro-focus" style={pill({ padding: '6px 12px', font: `500 12px ${SANS}`, borderBottom: 'none' })}>{PAID_FIX[err][0]}</Link>
+                        : <button type="button" className="astro-focus" onClick={retry} style={pill({ padding: '6px 12px', font: `500 12px ${SANS}` })}>Try again</button>}</div>}
                     </div>
                   </div>
 

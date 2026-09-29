@@ -111,14 +111,14 @@ export default function Landing() {
         <section style={{ padding: '44px 24px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 20 }}>
           <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: COP, display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ display: 'block', width: 28, height: 1, background: COP }} />
-            <span>Free birth chart · A minute to set up</span>
+            <span>Plans from €10 · Try 3 days for €3</span>
             <span style={{ display: 'block', width: 28, height: 1, background: COP }} />
           </div>
           <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(38px,9vw,64px)', lineHeight: 1.04, letterSpacing: '-.01em', maxWidth: 680, textWrap: 'balance' }}>You were born under a sky no one else has ever seen.</h1>
           <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, color: MUTED, maxWidth: 460, textWrap: 'pretty' }}>Enter your birth date, time and place. We plot the heavens exactly as they stood in that minute, then explain what they mean, in plain English.</p>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, width: '100%', maxWidth: 360, marginTop: 4 }}>
             <Link to="/signup" className="ld-cta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 54, padding: '0 20px 0 24px', background: INK, color: NAVY, border: 'none', borderBottom: 'none', borderRadius: 2, fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 16, letterSpacing: '.01em' }}>
-              <span>Get your free birth chart</span>
+              <span>Get your birth chart</span>
               <span style={{ fontFamily: MONO, fontSize: 14, opacity: .8 }}>→</span>
             </Link>
             <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.08em', color: MUTED }}>Takes about a minute</span>

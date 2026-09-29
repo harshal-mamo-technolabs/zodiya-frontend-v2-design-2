@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import { login as apiLogin, register as apiRegister } from '../lib/api.js';
 
@@ -14,6 +14,7 @@ const textLink = { alignSelf: 'flex-start', background: 'transparent', border: '
 /** `mode` comes from the route: /login or /signup. Reset is a local sub-state of login. */
 export default function SignIn({ mode }) {
   const navigate = useNavigate();
+  const [query] = useSearchParams();
   const [reset, setReset] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [email, setEmail] = useState('');
@@ -37,8 +38,10 @@ export default function SignIn({ mode }) {
       } else {
         await apiLogin({ email: email.trim(), password });
       }
-      // a fresh account has no profile yet; a returning one lands on home, which only sends to birth-details when nothing is saved
-      navigate(signup ? '/birth-details' : '/dashboard');
+      // a fresh account picks a plan first (straight to checkout if one was chosen on the pricing page);
+      // a returning one lands on home, which sends a lapsed account to pricing
+      const plan = query.get('plan');
+      navigate(!signup ? '/dashboard' : plan ? `/checkout?item=plan&plan=${encodeURIComponent(plan)}${query.get('trial') === '1' ? '&trial=1' : ''}` : '/subscription');
     } catch (e) {
       setError(e.message);
     } finally {
@@ -63,7 +66,7 @@ export default function SignIn({ mode }) {
           {[['Log in', 'login'], ['Create account', 'signup']].map(([text, key]) => {
             const on = mode === key;
             return (
-              <button key={key} type="button" onClick={() => { setReset(false); setResetSent(false); navigate('/' + key); }} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: `2px solid ${on ? '#1C2538' : 'transparent'}`, marginBottom: -1, padding: '10px 0', cursor: 'pointer', color: on ? '#1C2538' : '#4A5266', fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase' }}>{text}</button>
+              <button key={key} type="button" onClick={() => { setReset(false); setResetSent(false); navigate('/' + key + window.location.search); }} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: `2px solid ${on ? '#1C2538' : 'transparent'}`, marginBottom: -1, padding: '10px 0', cursor: 'pointer', color: on ? '#1C2538' : '#4A5266', fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase' }}>{text}</button>
             );
           })}
         </div>
@@ -127,7 +130,7 @@ export default function SignIn({ mode }) {
 
             {signup && (
               <div style={{ borderTop: '1px solid rgba(28,37,56,.25)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={{ ...label, color: '#5F8B7A' }}>Free, without a card</span>
+                <span style={{ ...label, color: '#5F8B7A' }}>Next, pick a plan · from €3 for a 3-day trial</span>
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13.5, lineHeight: 1.45, color: '#1C2538' }}>
                   {['Your natal wheel, saved and re-drawable', 'A daily horoscope written for your chart', 'Exact placement table and life path number'].map(t => (
                     <li key={t} style={{ display: 'flex', gap: 9 }}><span style={{ fontFamily: MONO, color: '#5F8B7A' }}>✓</span><span>{t}</span></li>

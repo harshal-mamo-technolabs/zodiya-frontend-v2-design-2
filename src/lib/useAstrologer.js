@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { astrologerSession, listProfiles } from './api.js';
+import { astrologerSession, endAstrologerSession, listProfiles } from './api.js';
+import { forgetStatus } from './billing.js';
 import { READINGS, SPEED, getHistory, saveHistory, clearHistory } from './astrologers.js';
 import { alignToWords, pacedWords } from './captions.js';
 import { runOnPage } from './pageActions.js';
@@ -23,13 +24,14 @@ export function findByName(list, name) {
  */
 export function useAstrologer({ prefs, profileId, page, navigate }) {
   const [aState, setAState] = useState('idle'); // idle | connecting | listening | thinking | speaking | error
-  const [err, setErr] = useState(null);         // mic | offline | unsupported | nospeech | setup
+  const [err, setErr] = useState(null);         // mic | offline | unsupported | nospeech | setup | minutes | plan
   const [caption, setCaption] = useState(null); // { words: [{ w, t }], idx }
   const [interim, setInterim] = useState('');
   const [hist, setHist] = useState(getHistory);
   const [live, setLive] = useState(false);      // a hands-free conversation is on
 
   const conv = useRef(null);
+  const meter = useRef(null);       // { id, maxSeconds } of the billed session
   const opening = useRef(null);
   const mode = useRef({ textOnly: false });
   const typed = useRef(null);       // a typed question, so its echo is not added twice
@@ -59,13 +61,20 @@ export function useAstrologer({ prefs, profileId, page, navigate }) {
     setHist(h => { const next = h.concat([m]).slice(-30); saveHistory(next); return next; });
   }, []);
 
+  /* Tells the API the call is over so its minutes are charged now; one report per session. */
+  const closeMeter = useCallback(() => {
+    const m = meter.current; meter.current = null;
+    if (m) endAstrologerSession(m.id).catch(() => {}).finally(forgetStatus);
+  }, []);
+
   const end = useCallback(async () => {
     Object.keys(timers.current).forEach(clear);
     const c = conv.current; conv.current = null; opening.current = null; stale.current = false;
     setOn(false);
     speech.current.live = false;
     if (c) try { await c.endSession(); } catch (e) {}
-  }, []);
+    closeMeter();
+  }, [closeMeter]);
 
   const touch = useCallback(() => {
     clear('idle');
@@ -105,7 +114,8 @@ export function useAstrologer({ prefs, profileId, page, navigate }) {
     if (!navigator.onLine) throw Object.assign(new Error('offline'), { kind: 'offline' });
 
     opening.current = (async () => {
-      const { signedUrl, dynamicVariables } = await astrologerSession({ character: p.char, profileId, page, greet });
+      const { signedUrl, dynamicVariables, session: billed } = await astrologerSession({ character: p.char, profileId, page, greet });
+      meter.current = billed;
       // the SDK is large, so it only loads once someone actually talks
       const { Conversation } = await import('@elevenlabs/client');
       const session = await Conversation.startSession({
@@ -184,21 +194,25 @@ export function useAstrologer({ prefs, profileId, page, navigate }) {
         },
         onError: () => fail('offline'),
         onDisconnect: () => {
-          conv.current = null; setOn(false);
+          conv.current = null; setOn(false); closeMeter(); clear('limit');
           if (stateRef.current !== 'error') { clear('tick'); setCaption(null); setInterim(''); set('idle'); }
         }
       });
       if (!textOnly) session.setMicMuted(true);
       conv.current = session;
+      // the balance runs out mid-call: hang up, the next open is refused anyway
+      clear('limit');
+      timers.current.limit = setTimeout(() => { end().then(() => fail('minutes')); }, billed.maxSeconds * 1000);
       mode.current = { textOnly, char: p.char, rate: p.rate };
       return session;
     })();
 
     try { return await opening.current; }
+    catch (e) { closeMeter(); throw e; }
     finally { opening.current = null; }
-  }, [end, fail, navigate, page, profileId, pushHist, runCaption, startSpeech, touch]);
+  }, [closeMeter, end, fail, navigate, page, profileId, pushHist, runCaption, startSpeech, touch]);
 
-  const kindOf = e => e.kind || (e.name === 'NotAllowedError' || e.name === 'NotFoundError' ? 'mic' : e.status === 503 ? 'setup' : 'offline');
+  const kindOf = e => e.kind || (e.code === 'minutes_exhausted' ? 'minutes' : e.code === 'plan_required' ? 'plan' : e.name === 'NotAllowedError' || e.name === 'NotFoundError' ? 'mic' : e.status === 503 ? 'setup' : 'offline');
 
   /* Voice needs the microphone granted; otherwise the reply arrives as text. */
   const voiceMode = () => prefsRef.current.voiceOn && prefsRef.current.micOk;

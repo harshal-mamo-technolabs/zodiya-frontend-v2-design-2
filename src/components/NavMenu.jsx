@@ -4,13 +4,14 @@ import { avatarImage } from '../lib/assets.js';
 import { listProfiles, logout } from '../lib/api.js';
 import { clearActive, readActive, writeActive } from '../lib/active-profile.js';
 import ProfileForm from './ProfileForm.jsx';
+import { euros, forgetStatus, getCatalog, getStatus } from '../lib/billing.js';
 
 
 const GROUPS = [
   { label: 'Today', items: [['Home', '/dashboard'], ['Daily Horoscope', '/daily-horoscope']] },
   { label: 'Your chart', items: [['Birth Details', '/birth-details'], ['Natal Chart', '/natal-chart'], ['Transits', '/transits']] },
   { label: 'Practices', items: [['Synastry', '/synastry'], ['Tarot', '/tarot'], ['Numerology', '/numerology']] },
-  { label: 'You', items: [['Your astrologer', '/choose-astrologer'], ['Account', '/account']] }
+  { label: 'You', items: [['Your astrologer', '/choose-astrologer'], ['Plan & billing', '/billing'], ['Account', '/account']] }
 ];
 
 const MONO = "'IBM Plex Mono',monospace";
@@ -20,6 +21,16 @@ const stop = e => e.stopPropagation();
 /* A new entry for someone else. Saving makes it the active profile, and the
    page reloads the same way a switch does so every reading follows it. */
 export function AddProfile({ onClose }) {
+  const navigate = useNavigate();
+  // null while checking; false means every paid slot is in use
+  const [free, setFree] = useState(null);
+  const [price, setPrice] = useState(null);
+  useEffect(() => {
+    forgetStatus();
+    getStatus().then(s => setFree(s.profiles.used < s.profiles.included + s.profiles.extra)).catch(() => setFree(true));
+    getCatalog().then(c => setPrice(c.profileSlot.amount)).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -39,7 +50,16 @@ export function AddProfile({ onClose }) {
           </div>
           <button type="button" onClick={onClose} aria-label="Close" style={{ width: 28, height: 28, flex: '0 0 auto', background: 'transparent', border: 'none', color: '#F4ECDC', fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: 0 }}>×</button>
         </div>
-        <ProfileForm withRelationship submitLabel="Add profile" busyLabel="Saving…" onSaved={() => window.location.reload()} />
+        {free === true && <ProfileForm withRelationship submitLabel="Add profile" busyLabel="Saving…" onSaved={() => window.location.reload()} />}
+        {free === false && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, borderTop: '1px solid rgba(244,236,220,.2)', paddingTop: 18 }}>
+            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: '#B4933F' }}>Extra profile{price != null ? ` · ${euros(price)} a month` : ''}</span>
+            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Your own profile is included in your plan. Every other person is an extra profile, billed monthly for as long as you keep them.</p>
+            <button type="button" onClick={() => { onClose(); navigate('/checkout?item=profile'); }} className="hov-cream" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 50, padding: '0 16px 0 18px', background: '#F4ECDC', color: '#1C2538', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 15 }}>
+              <span>Add a profile{price != null ? ` for ${euros(price)}/month` : ''}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

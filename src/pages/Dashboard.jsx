@@ -327,7 +327,7 @@ export default function Dashboard() {
               <Link to="/numerology" style={link19}>Numerology <span style={note}>{lifePath != null ? `Life path ${lifePath}` : ''}</span></Link>
             </div>
           </div>
-          <p style={{ margin: 0, maxWidth: '42ch', fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, lineHeight: 1.5, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Year-ahead transits and unlimited synastry are part of AstroMeridian Plus. <Link to="/subscription" style={{ fontFamily: MONO, fontStyle: 'normal', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD, whiteSpace: 'nowrap', borderBottom: 'none' }}>See plans →</Link></p>
+          <p style={{ margin: 0, maxWidth: '42ch', fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, lineHeight: 1.5, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Need longer with your astrologer? Top up minutes whenever you like. <Link to="/billing" style={{ fontFamily: MONO, fontStyle: 'normal', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD, whiteSpace: 'nowrap', borderBottom: 'none' }}>Top up →</Link></p>
         </section>
 
         <span className="om-foot" style={{ gridArea: 'foot', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.35)', lineHeight: 1.8 }}>Sky as seen from {latText(profile.lat)} · sidereal time {siderealTime(now, profile.lon)}</span>

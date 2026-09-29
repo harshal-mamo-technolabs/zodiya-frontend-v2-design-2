@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu, { AddProfile } from '../components/NavMenu.jsx';
 import { deleteMe, deleteProfile, getMe, listProfiles, logout, placeDetails, searchPlaces, updateMe, updateProfile } from '../lib/api.js';
 import { clearActive, readActive } from '../lib/active-profile.js';
+import { forgetStatus, getStatus, longDate } from '../lib/billing.js';
 import { checkDate, checkTime, coordText, formatDate, formatTime, MONTHS } from '../lib/date-input.js';
 
 /* A port of Account.dc.html: who you are, your birth entry, the people you saved,
@@ -40,7 +41,10 @@ export default function Account() {
   const [me, setMe] = useState(null);
   const [profiles, setProfiles] = useState([]);
   const [error, setError] = useState('');
-  const [adding, setAdding] = useState(false);
+  const [query, setQuery] = useSearchParams();
+  // back from buying a profile slot: open the form straight away
+  const [adding, setAdding] = useState(query.get('add') === '1');
+  const [billing, setBilling] = useState(null);
 
   // identity
   const [editing, setEditing] = useState(false);
@@ -75,6 +79,8 @@ export default function Account() {
 
   useEffect(() => {
     load().catch(e => { if (e.status === 401) navigate('/login'); else setError(e.message); });
+    forgetStatus();
+    getStatus().then(setBilling).catch(() => {});
   }, [navigate]);
 
   /* Birthplace lookup, the same debounced search the entry form uses. */
@@ -198,7 +204,7 @@ export default function Account() {
         </div>
       </header>
 
-      {adding && <AddProfile onClose={() => setAdding(false)} />}
+      {adding && <AddProfile onClose={() => { setAdding(false); if (query.get('add')) setQuery({}, { replace: true }); }} />}
 
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '32px 24px 56px', display: 'flex', flexDirection: 'column', gap: 30 }}>
         {error && <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14, lineHeight: 1.45 }}>{error}</div>}
@@ -309,6 +315,18 @@ export default function Account() {
               </div>
             </section>
 
+            {/* ------------------------------------------------ plan */}
+            <section style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .3s both' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingBottom: 10, borderBottom: `1px solid ${INK}` }}>
+                <h2 style={h2}>Plan</h2>
+                <span style={mono10}>{billing && billing.plan && billing.entitled ? (billing.plan.cancelAtPeriodEnd ? `Ends ${longDate(billing.plan.currentPeriodEnd)}` : `Renews ${longDate(billing.plan.currentPeriodEnd)}`) : ''}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)' }}>
+                <span style={{ flex: 1, fontSize: 14.5 }}>{!billing ? '…' : billing.entitled ? `${billing.plan.name}${billing.plan.trial ? ' trial' : ''} · ${Math.floor(billing.minutes.total / 60)} astrologer minutes left` : 'No active plan'}</span>
+                <Link to={billing && billing.entitled ? '/billing' : '/subscription'} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>{billing && billing.entitled ? 'Manage' : 'See plans'}</Link>
+              </div>
+            </section>
+
             {/* ------------------------------------------------ the way out */}
             <section style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 6, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .36s both' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -320,7 +338,7 @@ export default function Account() {
               </div>
               {deleteOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 14, borderTop: '1px solid rgba(244,236,220,.18)', animation: 'om-fade .25s ease both' }}>
-                  <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.72)', textWrap: 'pretty' }}>This removes your account, your chart and everyone you have saved. There is no undo. Export your data first if you want to keep it.</p>
+                  <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.72)', textWrap: 'pretty' }}>This cancels your plan straight away and removes your account, your chart and everyone you have saved. There is no refund and no undo. Export your data first if you want to keep it.</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                     <button type="button" onClick={deleteAccount} disabled={busy} style={{ border: '1px solid rgba(196,106,90,.7)', background: 'transparent', color: RED, padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>{busy ? 'Deleting' : 'Confirm deletion'}</button>
                     <button type="button" onClick={() => setDeleteOpen(false)} className="acc-quiet" style={{ ...quiet, color: 'rgba(244,236,220,.55)', padding: '9px 4px', fontSize: 10, letterSpacing: '.14em' }}>Keep it</button>
