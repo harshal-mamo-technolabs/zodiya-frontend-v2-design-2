@@ -1,0 +1,12 @@
+services:
+  astromeridian-frontend:
+    build:
+      context: .
+      args:
+        # read from .env next to this file
+        VITE_API_URL: ${VITE_API_URL}
+    ports:
+      - "5054:5054"
+    restart: always
+    volumes:
+      - ../log:/logs
