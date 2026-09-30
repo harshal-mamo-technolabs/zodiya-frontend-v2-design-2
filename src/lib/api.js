@@ -1,6 +1,6 @@
-/* Every call goes through Vite's /api proxy, so the browser stays same-origin
-   and the API's httpOnly session cookies ride along. */
-const BASE = '/api';
+/* Production builds call the API subdomain set in VITE_API_URL (.env). In dev
+   it is unset and calls go through Vite's /api proxy. */
+const BASE = import.meta.env.VITE_API_URL || '/api';
 
 export class ApiError extends Error {
   constructor(status, message, errors) {
@@ -44,7 +44,7 @@ async function call(path, { method = 'GET', body, signal, retried = false } = {}
     });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    throw new ApiError(0, 'Could not reach the server. Is the API running on port 5501?');
+    throw new ApiError(0, 'Could not reach the server. Please try again.');
   }
 
   if (res.status === 401 && !retried && !NO_REFRESH.some(p => path.startsWith(p))) {
