@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { getMe } from './lib/api.js';
 import { readActive } from './lib/active-profile.js';
@@ -53,14 +53,20 @@ function Paid({ children }) {
 export default function App() {
   // a profile switch remounts every page, so each reads the new active profile
   const [active, setActive] = useState(readActive);
+  // a sign-in, sign-up or sign-out remounts everything, so no page or widget
+  // keeps the last account's data in memory (lib/api.js sends the event)
+  const [session, setSession] = useState(0);
   useEffect(() => {
     const on = e => setActive(e.detail);
+    const fresh = () => { setActive(readActive()); setSession(n => n + 1); };
     window.addEventListener('meridian:active-profile', on);
-    return () => window.removeEventListener('meridian:active-profile', on);
+    window.addEventListener('meridian:session', fresh);
+    return () => { window.removeEventListener('meridian:active-profile', on); window.removeEventListener('meridian:session', fresh); };
   }, []);
 
   return (
     <>
+    <Fragment key={session}>
     <Routes key={active || 'none'}>
       <Route path="/" element={<Home />} />
       <Route path="/dashboard" element={<Paid><Dashboard /></Paid>} />
@@ -84,6 +90,7 @@ export default function App() {
     </Routes>
     {/* follows the reader across every signed-in page */}
     <AstrologerWidget />
+    </Fragment>
     </>
   );
 }

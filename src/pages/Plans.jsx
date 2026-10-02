@@ -37,6 +37,25 @@ export default function Plans() {
 
   const current = status && status.plan;
   const lapsed = current && !status.entitled;
+  /* Who is looking decides the opening words: a member changing plan, someone
+     whose plan ended, a new account that has not picked one yet, or a visitor. */
+  const intro = status && status.entitled ? {
+    eyebrow: 'Your plan',
+    title: 'Change your plan.',
+    text: 'A switch takes effect today, and whatever is left of your current plan is credited towards the new one. Every plan includes the full app; longer plans cost less per month and come with more time with your astrologer.'
+  } : lapsed ? {
+    eyebrow: 'Welcome back',
+    title: 'Pick up where you left off.',
+    text: 'Your charts and saved people are still here. Choose a plan to open them again.'
+  } : status ? {
+    // no eyebrow: birth details still come after this, so it is not a "last step"
+    title: 'Choose a plan to begin.',
+    text: 'A plan opens your natal chart, daily horoscope and transits, synastry, tarot, numerology and your own AI astrologer. Every plan includes all of it; longer plans simply cost less per month. Cancel any time.'
+  } : {
+    eyebrow: 'Choose a plan',
+    title: 'Everything in the sky, one plan away.',
+    text: 'Every plan includes the full app. Longer plans cost less per month and come with more time with your astrologer.'
+  };
   const trialOn = trial && (status === null || (status && status.trialAvailable && !status.entitled));
 
   const choose = tier => {
@@ -53,8 +72,7 @@ export default function Plans() {
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.55)' }} />
 
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
-        <Link to={status && status.entitled ? '/dashboard' : '/'} style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>← {status && status.entitled ? 'Home' : 'Back'}</Link>
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
+        <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         {status && status.entitled ? <NavMenu current="Plan & billing" />
           : status ? <button type="button" onClick={signOut} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>Log out</button>
           : <Link to="/login" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase' }}>Sign in</Link>}
@@ -62,9 +80,9 @@ export default function Plans() {
 
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '40px 24px 64px', display: 'flex', flexDirection: 'column', gap: 34 }}>
         <section style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14, animation: 'om-rise .5s cubic-bezier(.3,0,.2,1) both' }}>
-          <span style={eyebrow}>{status && status.entitled ? 'Your plan' : 'Choose a plan'}</span>
-          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(34px,7vw,54px)', lineHeight: 1.05, maxWidth: 720, textWrap: 'balance' }}>{status && status.entitled ? 'Change how you are billed.' : 'Everything in the sky, one plan away.'}</h1>
-          <p style={{ margin: 0, fontSize: 16, lineHeight: 1.55, color: MUTED, maxWidth: 520, textWrap: 'pretty' }}>Every plan opens the whole atlas. Longer plans cost less per month and bring more time with your astrologer.</p>
+          {intro.eyebrow && <span style={eyebrow}>{intro.eyebrow}</span>}
+          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(34px,7vw,54px)', lineHeight: 1.05, maxWidth: 720, textWrap: 'balance' }}>{intro.title}</h1>
+          <p style={{ margin: 0, fontSize: 16, lineHeight: 1.55, color: MUTED, maxWidth: 560, textWrap: 'pretty' }}>{intro.text}</p>
         </section>
 
         {error && <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14 }}>{error}</div>}
@@ -120,12 +138,13 @@ export default function Plans() {
           </div>
         )}
 
-        {catalog && (
+        {/* add-ons mean nothing before someone has a plan and has used the app */}
+        {catalog && status && status.entitled && (
           <section style={{ display: 'grid', gap: 18, gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', animation: 'om-rise .5s cubic-bezier(.3,0,.2,1) .3s both' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 14, borderTop: `1px solid ${INK}` }}>
               <span style={eyebrow}>More people</span>
-              <span style={{ fontFamily: SERIF, fontSize: 22 }}>{euros(catalog.profileSlot.amount)} a month per extra profile</span>
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED }}>Your own profile is included. Add a partner, a parent or a friend any time; each one is billed monthly for as long as you keep it.</p>
+              <span style={{ fontFamily: SERIF, fontSize: 22 }}>{catalog.profilePacks.map(p => `${p.extra} extra ${euros(p.amount)}`).join(' · ')}</span>
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED }}>Your own profile is included. For a partner, a parent or friends, pick a monthly pack of {catalog.profilePacks.map(p => p.extra).join(', ')} extra profiles, and switch whenever you need more room.{status && status.entitled ? <> <Link to="/billing">Choose a pack</Link>.</> : ''}</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 14, borderTop: `1px solid ${INK}` }}>
               <span style={eyebrow}>More minutes</span>

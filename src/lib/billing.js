@@ -22,6 +22,8 @@ export const getStatus = () => {
   return status;
 };
 export const forgetStatus = () => { status = null; };
+// another account signed in or out (lib/api.js): its status is not ours
+window.addEventListener('meridian:session', forgetStatus);
 
 export const euros = cents => {
   const v = cents / 100;
@@ -32,6 +34,12 @@ export const minutesText = seconds => {
   const m = Math.floor(seconds / 60);
   return `${m} min`;
 };
+
+/** Lifetime edits per profile, as the API enforces them. */
+export const EDIT_LIMITS = { primary: 3, extra: 1 };
+export const editsText = n => (n === 0 ? 'No edits left' : `${n} ${n === 1 ? 'edit' : 'edits'} left`);
+
+export const packName = p => `${p.extra} extra ${p.extra === 1 ? 'profile' : 'profiles'}`;
 
 export const cadence = months => (months === 1 ? 'month' : `${months} months`);
 

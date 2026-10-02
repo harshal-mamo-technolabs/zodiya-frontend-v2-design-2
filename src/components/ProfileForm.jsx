@@ -87,7 +87,16 @@ export default function ProfileForm({ defaultName = [], profile = null, withRela
   const dv = checkDate(date), tv = checkTime(time);
   const exact = !!(picked && picked.description === place);
   const showSuggestions = focused && hits.length > 0 && !exact;
-  const ready = !!(firstName.trim() && lastName.trim() && dv.iso && exact && (noTime || tv.hm) && (!withRelationship || relationship)) && !resolving;
+  // what still stands between the user and the button, in their words
+  const missing = [
+    !firstName.trim() && 'first name',
+    !lastName.trim() && 'last name',
+    !dv.iso && (dv.error ? `date of birth: ${dv.error}` : dv.partial ? 'date of birth: finish it as DD / MM / YYYY' : 'date of birth'),
+    !noTime && !tv.hm && (tv.error ? `time of birth: ${tv.error}` : "time of birth, or tick \"I don't know\""),
+    !exact && (place.trim() ? 'place of birth: choose it from the list' : 'place of birth'),
+    withRelationship && !relationship && 'who they are to you'
+  ].filter(Boolean);
+  const ready = missing.length === 0 && !resolving;
 
   const submit = async () => {
     if (!ready || busy) return;
@@ -223,7 +232,7 @@ export default function ProfileForm({ defaultName = [], profile = null, withRela
         <span style={{ fontFamily: MONO, fontSize: 14, opacity: .8 }}>→</span>
       </button>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED, flexWrap: 'wrap' }}>
-        <span>{ready ? 'Entry complete' : (noTime ? 'Name, date and place required' : (withRelationship ? 'All five lines required' : 'All four lines required'))}</span>
+        <span style={{ color: ready ? MUTED : '#B4933F', textWrap: 'pretty' }}>{ready ? 'Entry complete' : resolving ? 'Locating the place…' : `Still needed: ${missing.join(' · ')}`}</span>
         <span>Free · No card</span>
       </div>
     </div>

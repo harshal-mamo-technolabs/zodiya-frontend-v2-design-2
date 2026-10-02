@@ -5,14 +5,45 @@ export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', '
 
 export const digits = v => String(v || '').replace(/\D/g, '');
 
+/* Formats as you type and only lets through what can still become a real
+   date. Forgiving the way people type: "4" means day 04, "4/5/1990" means
+   04 / 05 / 1990, and "35" means day 03 then month 05. Anything that cannot fit
+   (a month 13, a year starting with 3) is simply not taken. checkDate does the
+   full calendar check once the date is complete. */
 export function formatDate(raw) {
-  const d = digits(raw).slice(0, 8);
+  let d = '';
+  const take = c => {
+    const n = d.length;
+    if (n === 0) d = c > '3' ? '0' + c : c;
+    else if (n === 1) {
+      const day = +(d + c);
+      if (day >= 1 && day <= 31) d += c;
+      else if (d !== '0') { d = '0' + d; take(c); } // "35": day 03, then 5 starts the month
+    }
+    else if (n === 2) d += c > '1' ? '0' + c : c;
+    else if (n === 3) {
+      const mon = +(d.slice(2) + c);
+      if (mon >= 1 && mon <= 12) d += c;
+      else if (d[2] !== '0') { d = d.slice(0, 2) + '0' + d[2]; take(c); }
+    }
+    else if (n === 4) { if (c === '1' || c === '2') d += c; }
+    else if (n < 8) d += c;
+  };
+  for (const c of String(raw || '')) {
+    if (/\d/.test(c)) take(c);
+    // a separator after one digit closes that part: "4/" is day 04
+    else if (/[/.\-\s]/.test(c)) {
+      if (d.length === 1) d = '0' + d;
+      else if (d.length === 3) d = d.slice(0, 2) + '0' + d[2];
+    }
+  }
   return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join(' / ');
 }
 
 /** {iso, error} — real calendar validation, not a length check. */
 export function checkDate(raw) {
   const d = digits(raw);
+  if (d.length > 0 && d.length < 8) return { iso: null, error: null, partial: true };
   if (d.length < 8) return { iso: null, error: null };
   const day = +d.slice(0, 2), mon = +d.slice(2, 4), year = +d.slice(4, 8);
   const thisYear = new Date().getFullYear();

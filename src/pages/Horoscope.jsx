@@ -98,20 +98,22 @@ export default function Horoscope() {
   }, [sign, period, zone, navigate]);
 
   const lang = data?.lang ?? 'en';
-  const shown = data && data.sign === sign && data.period === period ? data : null;
+  /* The last reading stays on screen, dimmed, while the next one loads. Clearing
+     it collapsed the page and made it jump on every sign or period tap. */
+  const shown = data;
+  const stale = !!data && (data.sign !== sign || data.period !== period);
   const strengthMarks = shown ? '▪'.repeat(shown.strength) + '▫'.repeat(5 - shown.strength) : '';
 
   return (
     <div style={{ minHeight: '100vh', background: NAVY, color: INK, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', fontFamily: "'Instrument Sans',Helvetica,Arial,sans-serif" }}>
-      <style>{CSS}</style>
+      <style>{CSS + '.hz-reading{display:contents}.hz-reading>*{transition:opacity .2s ease}.hz-reading[aria-busy=true]>*{opacity:.45}@media(max-width:600px){.hz-head{flex-direction:column;align-items:flex-start!important}}'}</style>
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}><Starfield /></div>
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.42)' }} />
 
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
-        <Link to="/natal-chart" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>← Chart</Link>
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
+        <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>{shown?.labels.ephemeris ?? 'Ephemeris'}</span>
+          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>{shown?.labels.ephemeris ?? 'Ephemeris'}</span>
           <NavMenu current="Daily Horoscope" />
         </div>
       </header>
@@ -137,9 +139,9 @@ export default function Horoscope() {
         </section>
 
         <section style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div className="hz-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: COP }}>{shown ? dateLine(period, shown.span, lang) : ' '}</span>
+              <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: COP }}>{shown ? dateLine(shown.period, shown.span, lang) : ' '}</span>
               <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,7.6vw,42px)', lineHeight: 1.04 }}>{shown?.signName ?? ' '}</h1>
             </div>
             <div style={{ display: 'flex', border: `1px solid ${INK}` }}>
@@ -152,7 +154,7 @@ export default function Horoscope() {
           {error && <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14, lineHeight: 1.45 }}>{error}</div>}
 
           {shown && (
-            <>
+            <div className="hz-reading" aria-busy={stale}>
               <p style={{ margin: 0, fontFamily: SERIF, fontSize: 'clamp(20px,5.4vw,27px)', lineHeight: 1.36, textWrap: 'pretty', maxWidth: '44ch' }}>{shown.headline}</p>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', borderLeft: '1px solid rgba(244,236,220,.25)', borderTop: '1px solid rgba(244,236,220,.25)', background: 'rgba(244,236,220,.08)' }}>
@@ -175,16 +177,16 @@ export default function Horoscope() {
                   </div>
                 </div>
                 <div style={cell}>
-                  <span style={cellLabel}>{shown.labels.moon[period]}</span>
+                  <span style={cellLabel}>{shown.labels.moon[shown.period]}</span>
                   <span style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.35 }}>{shown.moonLine}</span>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </section>
 
         {shown && (
-          <>
+          <div className="hz-reading" aria-busy={stale}>
             <section style={{ padding: '24px 24px 0' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, borderBottom: `1px solid ${INK}`, paddingBottom: 9 }}>
                 <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24 }}>{shown.labels.readings}</h2>
@@ -208,13 +210,13 @@ export default function Horoscope() {
 
             <section style={{ padding: '26px 24px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ border: '1px solid rgba(244,236,220,.3)', borderLeft: `2px solid ${GOLD}`, background: 'rgba(244,236,220,.08)', padding: '15px 16px', display: 'flex', flexDirection: 'column', gap: 9 }}>
-                <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED }}>{shown.labels.why[period]}</span>
+                <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED }}>{shown.labels.why[shown.period]}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', fontFamily: MONO, fontSize: 11, letterSpacing: '.03em', color: INK }}>
                   {shown.skyNotes.map(s => <span key={s}>{s}</span>)}
                 </div>
               </div>
             </section>
-          </>
+          </div>
         )}
       </main>
     </div>

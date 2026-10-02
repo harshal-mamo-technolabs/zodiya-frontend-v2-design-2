@@ -2,15 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import Starfield from '../components/Starfield.jsx';
-import { addProfileSlot, buyMinutes, changePlan, getCard, payOpenInvoice, saveCard, startCardSetup, subscribe } from '../lib/api.js';
-import { appearance, cadence, euros, fonts, forgetStatus, getCatalog, getStatus, getStripe, settle } from '../lib/billing.js';
+import { buyMinutes, chooseProfilePack, changePlan, getCard, payOpenInvoice, saveCard, startCardSetup, subscribe } from '../lib/api.js';
+import { appearance, cadence, euros, fonts, forgetStatus, getCatalog, getStatus, getStripe, longDate, packName, settle } from '../lib/billing.js';
 
 /* Every payment in the app happens here, on our own page with Stripe
-   Elements: a plan, a trial, an extra profile, a minute pack, an unpaid
+   Elements: a plan, a trial, a profile pack, a minute pack, an unpaid
    invoice, or a new card. The query string says which:
 
      ?item=plan&plan=starter[&trial=1]   ?item=change&plan=gold
-     ?item=profile                       ?item=minutes&pack=pack_10&qty=2
+     ?item=profiles&pack=profiles_3      ?item=minutes&pack=pack_10&qty=2
      ?item=invoice&kind=plan|profiles    ?item=card
    plus an optional &next=/path for where to go afterwards. */
 
@@ -24,7 +24,7 @@ const cta = on => ({ display: 'flex', alignItems: 'center', justifyContent: 'spa
 const quiet = { background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED };
 
 /** What is being bought, how to start paying for it, and when it has landed. */
-function describe(q, catalog) {
+function describe(q, catalog, status) {
   const item = q.get('item');
   const plan = catalog.plans.find(p => p.tier === q.get('plan'));
   if ((item === 'plan' || item === 'change') && plan) {
@@ -53,17 +53,43 @@ function describe(q, catalog) {
       cta: `Switch to ${plan.name}`
     };
   }
-  if (item === 'profile') return {
-    title: 'One more profile.',
-    lines: [['Extra profile, every month', euros(catalog.profileSlot.amount)]], dueToday: null,
-    notes: ['Charged today for the rest of this month, then monthly with your other profiles.', 'Removing a profile lowers the monthly total from the next invoice.'],
-    start: addProfileSlot,
-    // one more paid slot than when checkout opened; counting free slots fails
-    // for an account that already holds more profiles than it pays for
-    done: s => s.profiles.extra >= Number(q.get('slots')),
-    next: '/account?add=1',
-    cta: 'Add a profile'
-  };
+  if (item === 'profiles') {
+    const pack = catalog.profilePacks.find(p => p.id === q.get('pack'));
+    const current = status && catalog.profilePacks.find(p => p.id === status.profiles.pack);
+    if (pack) {
+      const used = status ? status.profiles.used : 0;
+      const roomNow = catalog.includedProfiles + (status ? status.profiles.extra : 0);
+      const roomNew = catalog.includedProfiles + pack.extra;
+      const canAdd = Math.max(0, roomNew - used);
+      const same = current && current.id === pack.id;
+      const up = !current || pack.extra > current.extra;
+      /* A switch is prorated by Stripe for the time left until the pack renews;
+         this is our estimate of it, Stripe's invoice has the exact figure. */
+      const end = status && status.profiles.currentPeriodEnd;
+      const share = current && end ? Math.min(1, Math.max(0, (new Date(end) - Date.now()) / (30.44 * 864e5))) : null;
+      const prorated = share == null || same ? null : Math.round((pack.amount - current.amount) * share);
+      return {
+        title: same ? `You already have ${packName(pack)}.` : current ? `${up ? 'Upgrade' : 'Downgrade'} to ${packName(pack)}.` : `${packName(pack)}, every month.`,
+        same,
+        slots: status && { used, roomNow, roomNew, canAdd },
+        lines: same ? [] : [[current ? `${euros(current.amount)} → ${euros(pack.amount)} a month` : 'Every month', euros(pack.amount)]],
+        dueToday: same ? null : current ? (prorated > 0 ? prorated : null) : pack.amount,
+        dueLabel: current && prorated > 0 ? 'About, today' : null,
+        // what every bill after today costs, so the prorated figure is not read as the new price
+        then: same ? null : [end && current ? `From ${longDate(end)}` : 'Then every month', `${euros(pack.amount)} / month`],
+        notes: same ? [] : [
+          current && end
+            ? (prorated > 0 ? `Today's amount is a one-off for the days left until ${longDate(end)}. From then on you pay the full ${euros(pack.amount)} every month.` : `About ${euros(Math.abs(prorated || 0))} unused is credited to your ${longDate(end)} invoice. From then on you pay ${euros(pack.amount)} every month.`)
+            : current ? 'The difference is charged or credited today; your renewal date stays the same.' : 'Renews every month and ends with your plan.',
+          'Saved people cannot be deleted, only switched off.'
+        ],
+        start: () => chooseProfilePack(pack.id),
+        done: s => s.profiles.pack === pack.id,
+        next: '/billing',
+        cta: current ? `${up ? 'Upgrade' : 'Downgrade'} to ${pack.extra} extra` : 'Continue to payment'
+      };
+    }
+  }
   if (item === 'minutes') {
     const pack = catalog.minutePacks.find(p => p.id === q.get('pack'));
     const qty = Math.min(catalog.maxPackQuantity, Math.max(1, parseInt(q.get('qty'), 10) || 1));
@@ -94,7 +120,7 @@ function describe(q, catalog) {
 }
 
 export default function Checkout() {
-  const [q, setQ] = useSearchParams();
+  const [q] = useSearchParams();
   const navigate = useNavigate();
   const [catalog, setCatalog] = useState(null);
   const [error, setError] = useState('');
@@ -102,23 +128,17 @@ export default function Checkout() {
   const [intent, setIntent] = useState(null); // { clientSecret, amount, description, paymentIntentId }
   const [card, setCard] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [freeSlot, setFreeSlot] = useState(false);
+  const [status, setStatus] = useState(null);
   const [after, setAfter] = useState(null); // status once the payment landed
   const started = useRef(false);
 
-  const order = useMemo(() => (catalog ? describe(q, catalog) : null), [q, catalog]);
+  const order = useMemo(() => (catalog ? describe(q, catalog, status) : null), [q, catalog, status]);
   const next = (q.get('next') || '').startsWith('/') ? q.get('next') : order && order.next;
 
   useEffect(() => {
     getCatalog().then(setCatalog).catch(e => setError(e.message));
     getStatus()
-      .then(s => {
-        setFreeSlot(s.profiles.used < s.profiles.included + s.profiles.extra);
-        // the target rides in the URL so it survives a 3-D Secure redirect
-        if (q.get('item') === 'profile' && !q.get('slots')) {
-          setQ(prev => { const n = new URLSearchParams(prev); n.set('slots', String(s.profiles.extra + 1)); return n; }, { replace: true });
-        }
-      })
+      .then(setStatus)
       .catch(e => { if (e.status === 401) navigate('/login'); });
     getCard().then(r => setCard(r.card)).catch(() => {});
   }, [navigate]);
@@ -178,6 +198,19 @@ export default function Checkout() {
           <section style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) both' }}>
             <span style={eyebrow}>{step === 'done' ? 'Confirmed' : 'Checkout'}</span>
             <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,6vw,42px)', lineHeight: 1.08, textWrap: 'balance' }}>{order.title}</h1>
+            {order.slots && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${INK}`, paddingTop: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                  {[['In use', order.slots.used], ['Room now', order.slots.roomNow], [order.same ? 'Your pack' : 'With this pack', order.slots.roomNew]].map(([label, n]) => (
+                    <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontFamily: SERIF, fontSize: 30, lineHeight: 1 }}>{n}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+                <span style={{ fontSize: 15, color: GOLD }}>{order.slots.canAdd ? `You can add ${order.slots.canAdd} more ${order.slots.canAdd === 1 ? 'person' : 'people'}.` : 'Every slot would be in use.'}</span>
+              </div>
+            )}
             {order.lines.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', borderTop: `1px solid ${INK}` }}>
                 {order.lines.map(([label, price]) => (
@@ -187,7 +220,12 @@ export default function Checkout() {
                 ))}
                 {(intent && intent.amount != null ? intent.amount : order.dueToday) != null && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '12px 0', fontFamily: MONO, fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase' }}>
-                    <span>Due today</span><span style={{ color: GOLD, fontSize: 15 }}>{euros(intent && intent.amount != null ? intent.amount : order.dueToday)}</span>
+                    <span>{intent && intent.amount != null ? 'Due today' : order.dueLabel || 'Due today'}</span><span style={{ color: GOLD, fontSize: 15 }}>{euros(intent && intent.amount != null ? intent.amount : order.dueToday)}</span>
+                  </div>
+                )}
+                {order.then && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderTop: '1px solid rgba(244,236,220,.18)', fontFamily: MONO, fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase' }}>
+                    <span>{order.then[0]}</span><span style={{ fontSize: 15 }}>{order.then[1]}</span>
                   </div>
                 )}
               </div>
@@ -200,18 +238,12 @@ export default function Checkout() {
           <section style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '22px 22px 24px', border: '1px solid rgba(244,236,220,.22)', background: 'rgba(28,37,56,.75)', animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .08s both' }}>
             {error && <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14, lineHeight: 1.45 }}>{error}</div>}
 
-            {step === 'review' && q.get('item') === 'profile' && freeSlot && (
+            {step === 'review' && !order.card && (
               <>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>You have a profile slot free already, so there is nothing to buy.</p>
-                <Link to="/account?add=1" className="hov-cream" style={{ ...cta(true), borderBottom: 'none' }}>
-                  <span>Add the profile</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
-                </Link>
-              </>
-            )}
-
-            {step === 'review' && !order.card && !(q.get('item') === 'profile' && freeSlot) && (
-              <>
-                {q.get('item') === 'profile' && !q.get('slots') ? <span style={eyebrow}>Loading…</span> : <>
+                {q.get('item') === 'profiles' && !status ? <span style={eyebrow}>Loading…</span> : order.same ? <>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>Nothing to pay. Pick a different pack to upgrade or downgrade.</p>
+                <Link to="/billing" className="hov-cream" style={{ ...cta(true), borderBottom: 'none' }}><span>See profile packs</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span></Link>
+                </> : <>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>{card ? `Your ${brand(card.brand)} ending ${card.last4} is on file.` : 'Card details come next, on this page. They go straight to Stripe and never touch our servers.'}</p>
                 <button type="button" onClick={begin} disabled={busy} className="hov-cream" style={cta(!busy)}>
                   <span>{busy ? 'One moment…' : order.cta}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
@@ -232,8 +264,8 @@ export default function Checkout() {
             {step === 'done' && (
               <>
                 <p style={{ margin: 0, fontFamily: SERIF, fontSize: 22, lineHeight: 1.3 }}>{order.card ? (card ? `${brand(card.brand)} ending ${card.last4} is now your card.` : 'Card saved.') : 'Thank you. It is all set.'}</p>
-                {q.get('item') === 'profile' && after && after.profiles.used >= after.profiles.included + after.profiles.extra && (
-                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>You now pay for {after.profiles.extra} extra {after.profiles.extra === 1 ? 'profile' : 'profiles'} and hold {after.profiles.used} in total, so every slot is in use. Add another slot to save someone new.</p>
+                {q.get('item') === 'profiles' && after && (
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>You have room for {after.profiles.included + after.profiles.extra} profiles and hold {after.profiles.used}.</p>
                 )}
                 <button type="button" onClick={() => navigate(next)} className="hov-cream" style={cta(true)}>
                   <span>Continue</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
@@ -327,8 +359,7 @@ function Shell({ children }) {
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}><Starfield /></div>
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.6)' }} />
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1100, width: '100%', margin: '0 auto' }}>
-        <Link to="/subscription" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>← Plans</Link>
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
+        <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <span style={{ ...quiet, cursor: 'default', display: 'flex', alignItems: 'center', gap: 6 }}><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true"><rect x="1" y="5" width="8" height="6.5" rx="1" fill="none" stroke="currentColor" /><path d="M3 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" /></svg>Secure</span>
       </header>
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1100, margin: '0 auto', padding: '36px 24px 56px' }}>{children}</main>

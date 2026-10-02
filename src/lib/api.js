@@ -71,18 +71,31 @@ async function call(path, { method = 'GET', body, signal, retried = false } = {}
   return data;
 }
 
-export const register = body => call('/auth/register', { method: 'POST', body });
-export const login = body => call('/auth/login', { method: 'POST', body });
-export const logout = () => call('/auth/logout', { method: 'POST' });
+/* Signing in, up or out changes whose data this tab may show, without a page
+   load. Drop what the last account left in storage (its active profile and its
+   astrologer chats) and tell the app to forget the rest (see App.jsx). A new
+   account also starts with no astrologer chosen, so it gets the introduction. */
+const newSession = (alsoForget = []) => {
+  for (const key of ['meridian_active_profile', 'meridian_astrologer_history', ...alsoForget]) {
+    try { localStorage.removeItem(key); } catch (e) {}
+  }
+  window.dispatchEvent(new Event('meridian:session'));
+};
+export const register = body => call('/auth/register', { method: 'POST', body }).then(r => { newSession(['meridian_astrologer']); return r; });
+export const login = body => call('/auth/login', { method: 'POST', body }).then(r => { newSession(); return r; });
+// the session ends here even if the call fails: the next account must not see this one
+export const logout = () => call('/auth/logout', { method: 'POST' }).finally(() => newSession());
 export const getMe = () => call('/auth/me');
 export const getStats = () => call('/stats');
 export const updateMe = body => call('/auth/me', { method: 'PATCH', body });
-export const deleteMe = () => call('/auth/me', { method: 'DELETE' });
+export const deleteMe = () => call('/auth/me', { method: 'DELETE' }).then(r => { newSession(['meridian_astrologer']); return r; });
 
-export const listProfiles = () => call('/profiles');
+/* Enabled profiles only; the account page passes true to manage disabled ones too. */
+export const listProfiles = (includeDisabled = false) => call(includeDisabled ? '/profiles?include=disabled' : '/profiles');
 export const createProfile = body => call('/profiles', { method: 'POST', body });
 export const updateProfile = (id, body) => call(`/profiles/${id}`, { method: 'PATCH', body });
-export const deleteProfile = id => call(`/profiles/${id}`, { method: 'DELETE' });
+// profiles are never deleted, only switched off and on
+export const setProfileDisabled = (id, disabled) => call(`/profiles/${id}/disabled`, { method: 'PATCH', body: { disabled } });
 export const saveBirthName = (id, birthName) => updateProfile(id, { birthName });
 export const getChart = (id, lang = 'en') => call(`/profiles/${id}/chart?lang=${lang}`);
 export const getHoroscope = ({ sign, period = 'daily', date, tz, lang = 'en' }) => call(`/horoscope?${new URLSearchParams({ sign, period, date, tz, lang })}`);
@@ -110,7 +123,7 @@ export const subscribe = (plan, trial = false) => call('/billing/subscribe', { m
 export const changePlan = plan => call('/billing/plan/change', { method: 'POST', body: { plan } });
 export const cancelPlan = () => call('/billing/plan/cancel', { method: 'POST' });
 export const resumePlan = () => call('/billing/plan/resume', { method: 'POST' });
-export const addProfileSlot = () => call('/billing/profiles', { method: 'POST' });
+export const chooseProfilePack = pack => call('/billing/profiles', { method: 'POST', body: { pack } });
 export const buyMinutes = (pack, quantity = 1) => call('/billing/minutes', { method: 'POST', body: { pack, quantity } });
 export const payOpenInvoice = kind => call('/billing/pay-open', { method: 'POST', body: { kind } });
 export const getCard = () => call('/billing/card');

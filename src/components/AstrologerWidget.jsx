@@ -84,7 +84,6 @@ export default function AstrologerWidget() {
   const [profileId, setProfileId] = useState(null);
   const [signedIn, setSignedIn] = useState(false);
   const [view, setView] = useState(() => { const s = getPrefs(); return !s.onboarded ? 'onboard' : s.minimized ? 'mini' : 'bubble'; });
-  const [tab, setTab] = useState('chat');
   const [input, setInput] = useState('');
   const [toast, setToast] = useState(false);
   const [vp, setVp] = useState({ vw: window.innerWidth, vh: window.innerHeight });
@@ -140,7 +139,7 @@ export default function AstrologerWidget() {
     else setView(v => (v === 'mini' || v === 'onboard' ? 'bubble' : v));
   }, [prefs.onboarded, prefs.minimized]);
 
-  useEffect(() => { const h = histRef.current; if (h) h.scrollTop = h.scrollHeight; }, [hist.length, view, tab]);
+  useEffect(() => { const h = histRef.current; if (h) h.scrollTop = h.scrollHeight; }, [hist.length, view]);
 
   const compact = vp.vw < 640;
   const M = compact ? 10 : 18, avW = compact ? 86 : 120, avH = compact ? 100 : 140, baseH = avH + (compact ? 70 : 76);
@@ -165,12 +164,14 @@ export default function AstrologerWidget() {
   const avoid = useCallback(() => {
     if (anchor !== 'rest' || aState !== 'idle' || (view !== 'bubble' && view !== 'mini')) return;
     if (!hits(0)) { setTucked(false); return; }
+    // a spot the user picked is kept: there it only fades, it does not wander off
+    if (prefs.xFrac != null) { setTucked(true); return; }
     for (let k = 1; k <= 10; k++) for (const sgn of [-1, 1]) {
       const d = sgn * k * 24;
       if (!hits(d)) { setNudge(n => n + d); setTucked(false); return; }
     }
     setTucked(true);
-  }, [anchor, aState, view, hits]);
+  }, [anchor, aState, view, hits, prefs.xFrac]);
 
   useEffect(() => { const t = setTimeout(avoid, 1200); return () => clearTimeout(t); }, [pathname, view, avoid]);
   useEffect(() => {
@@ -207,29 +208,36 @@ export default function AstrologerWidget() {
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   };
 
-  // snaps to the nearer edge and remembers the height as a fraction of the screen
+  /* Stays where it is let go. Both axes are kept as fractions of the screen, so
+     the spot survives a resize or rotation; the side it opens towards follows
+     whichever half of the screen it sits in. */
   const drop = () => {
     const d = dragAt.current, b = boxRef.current; if (!d || !b) return;
     const vw = window.innerWidth, vh = window.innerHeight, bw = b.offsetWidth, bh = b.offsetHeight;
     const side = d.x + bw / 2 < vw / 2 ? 'left' : 'right';
     const range = Math.max(1, vh - 2 * M - baseH);
     const yFrac = clamp((d.y - M) / range, 0, 1);
-    const x = side === 'right' ? vw - bw - M : M;
+    const xFrac = clamp((d.x - M) / Math.max(1, vw - 2 * M - bw), 0, 1);
+    const x = M + xFrac * Math.max(0, vw - 2 * M - bw);
     const y = yFrac < 0.5 ? M + yFrac * range : M + baseH + yFrac * range - bh;
-    save({ side, yFrac });
+    save({ side, yFrac, xFrac });
     setAnchor('snap'); setSnapTo({ x, y }); setNudge(0);
     setTimeout(() => { setAnchor('rest'); setTimeout(avoid, 320); }, 460);
   };
 
   const onHandleKey = e => {
     const k = e.key;
-    if (k === 'ArrowLeft' || k === 'ArrowRight') { e.preventDefault(); save({ side: k === 'ArrowLeft' ? 'left' : 'right' }); setNudge(0); }
+    if (k === 'ArrowLeft' || k === 'ArrowRight') {
+      e.preventDefault();
+      const xFrac = clamp((prefs.xFrac ?? (side === 'right' ? 1 : 0)) + (k === 'ArrowLeft' ? -0.1 : 0.1), 0, 1);
+      save({ xFrac, side: xFrac < 0.5 ? 'left' : 'right' }); setNudge(0);
+    }
     else if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); save({ yFrac: clamp((prefs.yFrac ?? 1) + (k === 'ArrowUp' ? -0.1 : 0.1), 0, 1) }); setNudge(0); }
   };
 
   // ---------- views ----------
-  const openPanel = () => { setView('panel'); setTab('chat'); setTucked(false); };
-  const collapse = () => { setView('bubble'); setTab('chat'); setTimeout(avoid, 400); };
+  const openPanel = () => { setView('panel'); setTucked(false); };
+  const collapse = () => { setView('bubble'); setTimeout(avoid, 400); };
   const minimize = () => { save({ minimized: true }); setView('mini'); };
   const restore = () => { if (dragged.current) return; save({ minimized: false }); setView('bubble'); setTimeout(avoid, 400); };
   const hide = () => { astro.stop(); save({ hidden: true }); setToast(true); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(false), 7000); };
@@ -256,7 +264,7 @@ export default function AstrologerWidget() {
   const typeInstead = () => {
     const first = !prefs.onboarded;
     save({ micAsked: true, onboarded: true, minimized: false });
-    astro.reset(); setView('panel'); setTab('chat');
+    astro.reset(); setView('panel');
     setTimeout(() => inputRef.current && inputRef.current.focus(), 50);
     if (first) astro.greet();
   };
@@ -282,18 +290,23 @@ export default function AstrologerWidget() {
   const big = view === 'panel' || view === 'onboard' || view === 'perm';
   const isSheet = view === 'panel' && compact;
   const pos = { position: 'fixed', left: 'auto', right: 'auto', top: 'auto', bottom: 'auto', transition: 'none', transform: 'none', transformOrigin: 'center', opacity: 1 };
-  if (isSheet) Object.assign(pos, { left: '0px', right: '0px', bottom: '0px' });
+  // phones: the open conversation takes the whole screen
+  if (isSheet) Object.assign(pos, { left: '0px', right: '0px', top: '0px', bottom: '0px' });
   else if (anchor === 'drag' && drag) Object.assign(pos, { left: px(drag.x), top: px(drag.y) });
   else if (anchor === 'snap' && snapTo) Object.assign(pos, { left: px(snapTo.x), top: px(snapTo.y), transition: 'left .44s cubic-bezier(.3,1.35,.5,1), top .44s cubic-bezier(.3,1.2,.5,1)' });
   else {
     const range = Math.max(0, vp.vh - 2 * M - baseH);
-    if (side === 'right') pos.right = px(M); else pos.left = px(M);
+    const placed = prefs.xFrac != null && !big;
+    // left = xFrac of the free width; shifting back by xFrac of its own width keeps it inside
+    if (placed) Object.assign(pos, { left: `calc(${M}px + ${prefs.xFrac} * (100% - ${2 * M}px))`, transform: `translateX(${-prefs.xFrac * 100}%)` });
+    else if (side === 'right') pos.right = px(M); else pos.left = px(M);
     if (big) { if (upper) pos.top = px(M); else pos.bottom = px(M); }
     else if (upper) pos.top = px(M + yFrac * range + nudge);
     else pos.bottom = px(M + (1 - yFrac) * range - nudge);
-    pos.transition = 'top .3s ease, bottom .3s ease, transform .35s ease, opacity .35s ease';
+    pos.transition = 'top .3s ease, bottom .3s ease, left .3s ease, transform .35s ease, opacity .35s ease';
     // never tuck away mid-conversation, so the switch and captions stay in reach
-    if (tucked && !hover && !big && aState === 'idle' && !live) Object.assign(pos, { transform: `translateX(${side === 'right' ? '34%' : '-34%'}) scale(.7)`, opacity: 0.55, transformOrigin: side === 'right' ? 'right center' : 'left center' });
+    // out of the way means smaller and fainter against its edge, never partly off screen
+    if (tucked && !hover && !big && aState === 'idle' && !live) Object.assign(pos, { transform: `${placed ? pos.transform : ''} scale(.7)`.trim(), opacity: 0.6, transformOrigin: side === 'right' ? 'right center' : 'left center' });
   }
 
   const [stateLabel, stateColor] = STATE_UI[aState] || STATE_UI.idle;
@@ -313,7 +326,6 @@ export default function AstrologerWidget() {
   const pulse = inset => (aState === 'listening' && !reduced ? <span aria-hidden="true" style={{ position: 'absolute', inset, borderRadius: '50%', border: '2px solid #7FD4C8', animation: 'astro-pulse 1.4s ease-out infinite', pointerEvents: 'none' }} /> : null);
   const liveText = aState === 'error' ? `${e[0]}. ${e[1]}` : aState === 'speaking' && caption ? caption.words.join(' ') : aState === 'listening' ? 'Listening' : aState === 'thinking' ? 'Thinking' : aState === 'connecting' ? 'Connecting' : '';
   const busy = aState === 'speaking';
-  const hasAnswer = hist.some(m => m.role !== 'user');
 
   // on/off for the whole conversation: the mic stays open while it is on
   const connecting = aState === 'connecting';
@@ -333,22 +345,11 @@ export default function AstrologerWidget() {
   const ctrls = [
     { label: prefs.voiceOn ? 'Mute' : 'Unmute', aria: prefs.voiceOn ? 'Mute voice' : 'Unmute voice', d: prefs.voiceOn ? ['M4 9h4l5-4v14l-5-4H4z', 'M16.5 9a4 4 0 0 1 0 6', 'M19 6.5a8 8 0 0 1 0 11'] : ['M4 9h4l5-4v14l-5-4H4z', 'M16 9l5 6M21 9l-5 6'], onClick: () => { astro.stop(); save({ voiceOn: !prefs.voiceOn }); }, pressed: !prefs.voiceOn, bg: prefs.voiceOn ? 'transparent' : 'rgba(239,234,224,.08)' },
     { label: 'CC', aria: subs ? 'Turn subtitles off' : 'Turn subtitles on', d: ['M3 6h18v12H3z', 'M10 10.5a2 2 0 1 0 0 3', 'M17 10.5a2 2 0 1 0 0 3'], onClick: () => save({ subs: !subs }), pressed: subs, border: subs ? 'rgba(212,178,106,.5)' : undefined, color: subs ? '#EBD39A' : SOFT },
-    { label: 'Stop', aria: 'Stop speaking', d: ['M7 7h10v10H7z'], onClick: astro.stop, disabled: !busy },
-    { label: 'Replay', aria: 'Replay last answer', d: ['M4 12a8 8 0 1 0 2.4-5.7', 'M4 4v4.5h4.5'], onClick: astro.replay, disabled: !hasAnswer }
-  ];
-  const toggles = [
-    ['Speak answers aloud', `Uses ${ch.name}'s own voice`, prefs.voiceOn, () => { astro.stop(); save({ voiceOn: !prefs.voiceOn }); }],
-    ['Subtitles', 'Live captions, word by word, on by default', subs, () => save({ subs: !subs })],
-    ['Reduce motion', 'Stills idle animation, pulses and snapping', reduced, () => save({ motion: reduced ? 'full' : 'reduced' })]
-  ];
-  const segs = [
-    ['Speaking speed', prefs.rate, [['slow', 'Slower'], ['normal', 'Normal'], ['fast', 'Faster']], v => save({ rate: v })],
-    ['Subtitle size', prefs.subSize, [['S', 'Small'], ['M', 'Medium'], ['L', 'Large']], v => save({ subSize: v })]
   ];
 
   const cardW = 'min(340px, calc(100vw - 24px))';
   const panelW = isSheet ? '100vw' : 'min(390px, calc(100vw - 36px))';
-  const panelH = isSheet ? 'min(64vh, 600px)' : 'min(640px, calc(100vh - 36px))';
+  const panelH = isSheet ? '100dvh' : 'min(640px, calc(100vh - 36px))';
 
   return (
     <div data-astro-widget="true" style={{ fontFamily: SANS, color: INK, WebkitFontSmoothing: 'antialiased' }}>
@@ -358,7 +359,7 @@ export default function AstrologerWidget() {
         <div ref={boxRef} role="region" aria-label={`${ch.name}, your AI astrologer`} onKeyDown={ev => { if (ev.key === 'Escape' && view === 'panel') { ev.stopPropagation(); collapse(); } }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} style={{ ...pos, zIndex: 900 }}>
 
           {view === 'bubble' && (
-            <div style={{ display: 'flex', flexDirection: side === 'right' ? 'row-reverse' : 'row', alignItems: upper ? 'flex-start' : 'flex-end', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: side === 'right' ? 'row-reverse' : 'row', alignItems: upper ? 'flex-start' : 'flex-end', gap: 12, maxWidth: `calc(100vw - ${2 * M}px)` }}>
               <div ref={hitRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <div style={{ position: 'relative', width: avW, height: avH }}>
                   {pulse('18% 12% 4%')}
@@ -382,7 +383,7 @@ export default function AstrologerWidget() {
               </div>
 
               {showCard && (
-                <div style={{ width: compact ? 'min(260px, calc(100vw - 130px))' : 'min(320px, calc(100vw - 180px))', padding: '14px 16px', borderRadius: 18, background: 'rgba(14,18,38,.95)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `1px solid ${aState === 'error' ? 'rgba(235,160,160,.45)' : aState === 'listening' ? 'rgba(127,212,200,.45)' : 'rgba(239,234,224,.14)'}`, boxShadow: '0 18px 50px rgba(0,0,0,.5)', display: 'flex', flexDirection: 'column', gap: 10, animation: 'astro-in .3s ease both' }}>
+                <div style={{ flex: '1 1 auto', minWidth: 0, width: compact ? 260 : 320, padding: '14px 16px', borderRadius: 18, background: 'rgba(14,18,38,.95)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `1px solid ${aState === 'error' ? 'rgba(235,160,160,.45)' : aState === 'listening' ? 'rgba(127,212,200,.45)' : 'rgba(239,234,224,.14)'}`, boxShadow: '0 18px 50px rgba(0,0,0,.5)', display: 'flex', flexDirection: 'column', gap: 10, animation: 'astro-in .3s ease both' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ font: `500 10px ${MONO}`, letterSpacing: '.12em', textTransform: 'uppercase', color: stateColor }}>{cardEyebrow}</div>
                     {cardAnim}
@@ -450,23 +451,19 @@ export default function AstrologerWidget() {
           )}
 
           {view === 'panel' && (
-            <div style={{ width: panelW, height: panelH, display: 'flex', flexDirection: 'column', background: PANEL, border: '1px solid rgba(239,234,224,.14)', borderRadius: isSheet ? '22px 22px 0 0' : 22, boxShadow: '0 30px 80px rgba(0,0,0,.6)', overflow: 'hidden', animation: 'astro-in .3s cubic-bezier(.2,.7,.2,1) both' }}>
-              {isSheet && <div style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, background: 'rgba(239,234,224,.25)', marginTop: 8 }} />}
+            <div style={{ width: panelW, height: isSheet || hist.length || aState !== 'idle' ? panelH : 'auto', maxHeight: panelH, paddingTop: isSheet ? 'env(safe-area-inset-top)' : 0, paddingBottom: isSheet ? 'env(safe-area-inset-bottom)' : 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', background: PANEL, border: '1px solid rgba(239,234,224,.14)', borderRadius: isSheet ? 0 : 22, boxShadow: '0 30px 80px rgba(0,0,0,.6)', overflow: 'hidden', animation: 'astro-in .3s cubic-bezier(.2,.7,.2,1) both' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 12px 10px 16px', borderBottom: '1px solid rgba(239,234,224,.08)' }}>
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <div style={{ font: `500 20px/1.1 ${SERIF}`, color: INK }}>{ch.name}</div>
                   <div style={{ font: `400 10px ${MONO}`, letterSpacing: '.12em', textTransform: 'uppercase', color: DIM }}>{ch.role}</div>
                 </div>
-                <button type="button" className="astro-focus" onClick={() => setTab(t => (t === 'settings' ? 'chat' : 'settings'))} aria-label="Astrologer settings" aria-pressed={tab === 'settings'} title="Settings" style={{ height: 34, padding: '0 12px', borderRadius: 999, border: `1px solid ${tab === 'settings' ? 'rgba(212,178,106,.5)' : 'rgba(239,234,224,.18)'}`, background: tab === 'settings' ? 'rgba(212,178,106,.14)' : 'transparent', color: INK, display: 'flex', alignItems: 'center', gap: 6, font: `400 13px ${SANS}`, cursor: 'pointer' }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" style={{ fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' }}><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></svg>Settings
-                </button>
                 <button type="button" className="astro-hov astro-focus" onClick={minimize} aria-label="Minimize astrologer" title="Minimize" style={{ ...round(34), background: 'transparent' }}><Icon d={['M6 12h12']} /></button>
                 <button type="button" className="astro-hov astro-focus" onClick={collapse} aria-label="Close conversation" title="Close" style={{ ...round(34), background: 'transparent' }}><Icon d={['M7 7l10 10M17 7L7 17']} /></button>
               </div>
 
-              {tab === 'chat' ? (
                 <>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 16px', background: 'radial-gradient(ellipse 80% 120% at 20% 50%,rgba(183,164,230,.12),transparent 70%)', borderBottom: '1px solid rgba(239,234,224,.06)' }}>
+                  {/* the stage card only appears while something is happening: captions, connecting, an error */}
+                  {aState !== 'idle' && <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 16px', background: 'radial-gradient(ellipse 80% 120% at 20% 50%,rgba(183,164,230,.12),transparent 70%)', borderBottom: '1px solid rgba(239,234,224,.06)' }}>
                     <div style={{ position: 'relative', width: compact ? 64 : 92, height: compact ? 74 : 106, flexShrink: 0 }}><Figure id={ch.id} state={aState === 'connecting' ? 'thinking' : aState} reduced={reduced} /></div>
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, font: `500 10px ${MONO}`, letterSpacing: '.12em', textTransform: 'uppercase', color: stateColor }}>
@@ -477,10 +474,9 @@ export default function AstrologerWidget() {
                         ? <Link to={PAID_FIX[err][1]} onClick={astro.reset} className="astro-focus" style={pill({ padding: '6px 12px', font: `500 12px ${SANS}`, borderBottom: 'none' })}>{PAID_FIX[err][0]}</Link>
                         : <button type="button" className="astro-focus" onClick={retry} style={pill({ padding: '6px 12px', font: `500 12px ${SANS}` })}>Try again</button>}</div>}
                     </div>
-                  </div>
+                  </div>}
 
                   <div ref={histRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin', scrollbarColor: 'rgba(239,234,224,.18) transparent', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    {hist.length === 0 && <div style={{ margin: 'auto 0', textAlign: 'center', font: `400 14px/1.5 ${SANS}`, color: DIM, padding: '8px 20px' }}>Ask about your Sun, Moon, rising, houses or today's transits. Your conversation appears here.</div>}
                     {hist.map((m, i) => m.role === 'user'
                       ? <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '84%', padding: '9px 13px', borderRadius: '16px 16px 4px 16px', background: 'rgba(212,178,106,.14)', border: '1px solid rgba(212,178,106,.3)', font: `400 14px/1.45 ${SANS}`, color: INK }}>{m.text}</div>
                       : (
@@ -501,53 +497,18 @@ export default function AstrologerWidget() {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 12px 12px', borderTop: '1px solid rgba(239,234,224,.08)', background: '#0B0F20' }}>
-                    <div style={{ display: 'flex', gap: 4, justifyContent: 'space-between' }}>
+                    <form onSubmit={submit} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: 0 }}>
                       {ctrls.map(k => (
-                        <button key={k.aria} type="button" className="astro-focus" onClick={k.onClick} aria-label={k.aria} aria-pressed={k.pressed} disabled={k.disabled} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, borderRadius: 10, border: `1px solid ${k.border || 'rgba(239,234,224,.14)'}`, background: k.bg || 'transparent', color: k.color || INK, font: `400 12px ${SANS}`, cursor: k.disabled ? 'default' : 'pointer', padding: '0 6px', opacity: k.disabled ? 0.45 : 1 }}>
-                          <Icon d={k.d} />{k.label}
+                        <button key={k.aria} type="button" className="astro-focus" onClick={k.onClick} aria-label={k.aria} aria-pressed={k.pressed} disabled={k.disabled} title={k.label} style={{ width: 44, height: 44, flexShrink: 0, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, borderRadius: 10, border: `1px solid ${k.border || 'rgba(239,234,224,.14)'}`, background: k.bg || 'transparent', color: k.color || INK, font: `400 12px ${SANS}`, cursor: k.disabled ? 'default' : 'pointer', padding: '0 6px', opacity: k.disabled ? 0.45 : 1 }}>
+                          <Icon d={k.d} />
                         </button>
                       ))}
-                    </div>
-                    <form onSubmit={submit} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: 0 }}>
                       <input ref={inputRef} value={input} onChange={ev => setInput(ev.target.value)} placeholder={`Ask about your ${compact ? 'chart' : 'chart, houses or today'}…`} aria-label="Type a question about your readings" style={{ flex: 1, minWidth: 0, height: 48, padding: '0 16px', borderRadius: 999, border: '1px solid rgba(239,234,224,.16)', background: 'rgba(239,234,224,.05)', color: INK, font: `400 15px ${SANS}`, outline: 'none' }} />
                       <button type="submit" className="astro-focus" aria-label="Send question" title="Send" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: '50%', border: '1px solid rgba(239,234,224,.2)', background: 'transparent', color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><Icon d={['M5 12h14M13 6l6 6-6 6']} size={18} /></button>
                     </form>
                     <div style={{ display: 'flex' }}>{liveSwitch(true)}</div>
                   </div>
                 </>
-              ) : (
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 16, display: 'flex', flexDirection: 'column', gap: 18, scrollbarWidth: 'thin', scrollbarColor: 'rgba(239,234,224,.18) transparent' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: '1px solid rgba(239,234,224,.1)', background: 'rgba(239,234,224,.03)' }}>
-                    <div style={{ width: 52, height: 58, flexShrink: 0 }}><Figure id={ch.id} state="idle" reduced={reduced} framing="face" /></div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ font: `500 18px/1.1 ${SERIF}`, color: INK }}>{ch.name}</div>
-                      <div style={{ font: `400 12px/1.4 ${SANS}`, color: DIM }}>{ch.role}</div>
-                    </div>
-                    <Link to="/choose-astrologer" style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(212,178,106,.5)', font: `500 13px ${SANS}`, color: GOLD }}>Change</Link>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {toggles.map(([label, sub, on, fn]) => (
-                      <button key={label} type="button" role="switch" aria-checked={on} className="astro-focus" onClick={fn} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 4px', border: 0, borderBottom: '1px solid rgba(239,234,224,.06)', background: 'transparent', color: INK, textAlign: 'left', cursor: 'pointer' }}>
-                        <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}><span style={{ font: `400 15px ${SANS}` }}>{label}</span><span style={{ font: `400 12px/1.4 ${SANS}`, color: DIM }}>{sub}</span></span>
-                        <span style={{ position: 'relative', width: 40, height: 22, borderRadius: 11, background: on ? GOLD : 'rgba(239,234,224,.18)', flexShrink: 0, transition: 'background .2s' }}><span style={{ position: 'absolute', top: 3, left: on ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: INK, transition: 'left .2s' }} /></span>
-                      </button>
-                    ))}
-                  </div>
-                  {segs.map(([label, cur, opts, fn]) => (
-                    <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ font: `500 10px ${MONO}`, letterSpacing: '.12em', textTransform: 'uppercase', color: DIM }}>{label}</div>
-                      <div role="radiogroup" aria-label={label} style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 12, background: 'rgba(239,234,224,.05)' }}>
-                        {opts.map(([v, l]) => <button key={v} type="button" role="radio" aria-checked={cur === v} className="astro-focus" onClick={() => fn(v)} style={{ flex: 1, height: 34, borderRadius: 9, border: 0, background: cur === v ? GOLD : 'transparent', color: cur === v ? '#07091A' : SOFT, font: `500 13px ${SANS}`, cursor: 'pointer' }}>{l}</button>)}
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4 }}>
-                    <button type="button" className="astro-focus" onClick={() => { save({ side: 'right', yFrac: 1 }); setNudge(0); }} style={pill({ padding: '9px 14px', font: `400 13px ${SANS}`, border: '1px solid rgba(239,234,224,.2)' })}>Reset position</button>
-                    <button type="button" className="astro-focus" onClick={astro.clearHist} style={pill({ padding: '9px 14px', font: `400 13px ${SANS}`, border: '1px solid rgba(239,234,224,.2)' })}>Clear conversation</button>
-                    <button type="button" className="astro-focus" onClick={hide} style={pill({ padding: '9px 14px', font: `400 13px ${SANS}`, border: '1px solid rgba(224,138,138,.4)', color: '#EBB0B0' })}>Hide from all pages</button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>

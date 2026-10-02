@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu, { AddProfile } from '../components/NavMenu.jsx';
-import { deleteMe, deleteProfile, getMe, listProfiles, logout, placeDetails, searchPlaces, updateMe, updateProfile } from '../lib/api.js';
+import { deleteMe, getMe, listProfiles, logout, placeDetails, searchPlaces, setProfileDisabled, updateMe, updateProfile } from '../lib/api.js';
 import { clearActive, readActive } from '../lib/active-profile.js';
-import { forgetStatus, getStatus, longDate } from '../lib/billing.js';
+import { EDIT_LIMITS, editsText, forgetStatus, getStatus, longDate, packName } from '../lib/billing.js';
 import { checkDate, checkTime, coordText, formatDate, formatTime, MONTHS } from '../lib/date-input.js';
 
 /* A port of Account.dc.html: who you are, your birth entry, the people you saved,
-   what you want sent, your plan, and the way out. Every control does what it says. */
+   your plan, and the way out. Every control does what it says. */
 
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',Georgia,serif";
@@ -17,6 +17,7 @@ const INK = '#F4ECDC', NAVY = '#1C2538', GOLD = '#B4933F', RED = '#C46A5A';
 const CSS = `
 .acc-line:hover{background:rgba(244,236,220,.1) !important;color:#F4ECDC !important;border-color:#F4ECDC !important}
 .acc-remove:hover{color:#C46A5A !important}
+.acc-toggle:hover{color:#F4ECDC !important}
 .acc-quiet:hover{color:#F4ECDC !important}
 .acc-input::placeholder{color:rgba(244,236,220,.3)}
 `;
@@ -30,11 +31,6 @@ const dob = iso => { const [y, m, d] = iso.split('-'); return `${d} ${MONTHS[+m 
 const editedOn = iso => { const d = new Date(iso); return `Last edited ${d.getDate()} ${MONTHS[d.getMonth()]}`; };
 const initials = (a, b) => `${(a || '').trim().charAt(0)}${(b || '').trim().charAt(0)}`.toUpperCase();
 
-const NOTIFICATIONS = [
-  ['daily', 'Daily horoscope', 'One reading each morning, written for your chart.'],
-  ['transits', 'Major transits', 'Only outer-planet contacts within one degree.'],
-  ['retro', 'Retrograde alerts', 'Mercury, Venus and Mars stations.']
-];
 
 export default function Account() {
   const navigate = useNavigate();
@@ -60,11 +56,11 @@ export default function Account() {
   const seq = useRef(0);
 
   // the way out
-  const [removing, setRemoving] = useState(null);
+  const [switching, setSwitching] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const load = () => Promise.all([getMe(), listProfiles()]).then(([account, list]) => {
+  const load = () => Promise.all([getMe(), listProfiles(true)]).then(([account, list]) => {
     setMe(account); setProfiles(list);
     setFirst(account.firstName); setLast(account.lastName);
     const own = list.find(p => p.isPrimary);
@@ -118,9 +114,12 @@ export default function Account() {
   const [firstName, ...rest] = (fields?.name ?? '').trim().split(/\s+/);
   const valid = !!(firstName && rest.length && dv.iso && tv.hm && exact);
   const dirty = state === 'dirty';
+  // every save that changes the name or birth data uses one of a lifetime few
+  const locked = !!own && own.editsLeft === 0;
+  const slots = billing ? billing.profiles.included + billing.profiles.extra : null;
 
   const save = async () => {
-    if (!dirty || !valid || !own) return;
+    if (!dirty || !valid || !own || locked) return;
     setState('saving'); setError('');
     try {
       await updateProfile(own._id, { firstName, lastName: rest.join(' '), birthDate: dv.iso, birthTime: tv.hm, city: picked.city, state: picked.state, country: picked.country });
@@ -139,27 +138,15 @@ export default function Account() {
     finally { setBusy(false); }
   };
 
-  const toggle = async key => {
-    const next = { ...me.notifications, [key]: !me.notifications[key] };
-    setMe(m => ({ ...m, notifications: next }));
-    try { await updateMe({ notifications: { [key]: next[key] } }); } catch (e) { setError(e.message); }
-  };
-  const [delivery, setDelivery] = useState('');
-  useEffect(() => { if (me) setDelivery(me.notifications.deliveryTime.replace(':', ' : ')); }, [me]);
-  const saveDelivery = async () => {
-    const { hm } = checkTime(delivery);
-    if (!hm || hm === me.notifications.deliveryTime) { setDelivery(me.notifications.deliveryTime.replace(':', ' : ')); return; }
-    try { setMe(await updateMe({ notifications: { deliveryTime: hm } })); } catch (e) { setError(e.message); }
-  };
-
-  const remove = async p => {
-    if (removing !== p._id) { setRemoving(p._id); return; }
+  /* Off hides someone from every page and reading; their slot stays taken. */
+  const switchProfile = async p => {
+    setSwitching(p._id); setError('');
     try {
-      await deleteProfile(p._id);
-      if (readActive() === p._id) clearActive();
-      setRemoving(null);
-      setProfiles(list => list.filter(x => x._id !== p._id));
-    } catch (e) { setError(e.message); setRemoving(null); }
+      const updated = await setProfileDisabled(p._id, !p.disabled);
+      if (updated.disabled && readActive() === p._id) clearActive();
+      setProfiles(list => list.map(x => (x._id === p._id ? updated : x)));
+    } catch (e) { setError(e.message); }
+    finally { setSwitching(null); }
   };
 
   const signOut = async () => {
@@ -196,10 +183,9 @@ export default function Account() {
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.72)' }} />
 
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
-        <Link to="/" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>← Home</Link>
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
+        <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.6)' }}>Account</span>
+          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.6)' }}>Account</span>
           <NavMenu current="Account" />
         </div>
       </header>
@@ -239,7 +225,7 @@ export default function Account() {
             <section style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .12s both' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingBottom: 10, borderBottom: `1px solid ${INK}` }}>
                 <h2 style={h2}>Birth details</h2>
-                <span style={mono10}>{!own ? 'Nothing saved yet' : state === 'saved' ? 'Saved' : dirty ? 'Unsaved changes' : state === 'saving' ? 'Saving' : editedOn(own.updatedAt)}</span>
+                <span style={mono10}>{!own ? 'Nothing saved yet' : state === 'saved' ? 'Saved' : dirty ? 'Unsaved changes' : state === 'saving' ? 'Saving' : `${editedOn(own.updatedAt)} · ${editsText(own.editsLeft)}`}</span>
               </div>
               {!fields && (
                 <Link to="/birth-details" style={{ padding: '14px 0', fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>+ Add your birth details</Link>
@@ -247,7 +233,7 @@ export default function Account() {
               {fields && birthRows.map(([label, key, hint, format]) => (
                 <label key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 16, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)', position: 'relative' }}>
                   <span style={{ flex: '0 0 116px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.6)' }}>{label}</span>
-                  <input className="acc-input" type="text" value={fields[key]} onChange={e => set(key, format(e.target.value))} onFocus={() => key === 'place' && setFocused(true)} onBlur={() => key === 'place' && setTimeout(() => setFocused(false), 120)} autoComplete="off" style={rowInput} />
+                  <input className="acc-input" type="text" value={fields[key]} readOnly={locked} onChange={e => set(key, format(e.target.value))} onFocus={() => key === 'place' && setFocused(true)} onBlur={() => key === 'place' && setTimeout(() => setFocused(false), 120)} autoComplete="off" style={rowInput} />
                   <span style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: (key === 'date' && dv.error) || (key === 'time' && tv.error) || (key === 'place' && !exact) ? GOLD : 'rgba(244,236,220,.4)' }}>{hint}</span>
                   {key === 'place' && focused && hits.length > 0 && !exact && (
                     <ul style={{ listStyle: 'none', margin: 0, padding: 0, position: 'absolute', left: 132, right: 0, top: '100%', zIndex: 5, background: NAVY, border: `1px solid ${INK}`, boxShadow: '0 10px 24px rgba(244,236,220,.14)', maxHeight: 230, overflow: 'auto', animation: 'om-fade .16s ease both' }}>
@@ -265,7 +251,7 @@ export default function Account() {
               ))}
               {fields && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 14 }}>
-                  <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'rgba(244,236,220,.55)', textWrap: 'pretty' }}>Changing the time redraws your chart and every saved reading.</span>
+                  <span style={{ fontSize: 12.5, lineHeight: 1.5, color: locked ? GOLD : 'rgba(244,236,220,.55)', textWrap: 'pretty' }}>{locked ? `All ${EDIT_LIMITS.primary} edits are used, so your birth details are now fixed.` : ''}</span>
                   <button type="button" onClick={save} disabled={!dirty || !valid || state === 'saving'} style={{ flex: '0 0 auto', border: `1px solid ${dirty && valid ? INK : 'rgba(244,236,220,.25)'}`, background: dirty && valid ? 'rgba(244,236,220,.12)' : 'transparent', color: dirty && valid ? INK : 'rgba(244,236,220,.45)', padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: dirty && valid ? 'pointer' : 'default', transition: 'background .2s ease,color .2s ease' }}>{state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving' : 'Save changes'}</button>
                 </div>
               )}
@@ -275,44 +261,20 @@ export default function Account() {
             <section style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .18s both' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingBottom: 10, borderBottom: `1px solid ${INK}` }}>
                 <h2 style={h2}>Saved people</h2>
-                <span style={mono10}>{people.length} saved</span>
+                <span style={mono10}>{slots == null ? `${people.length} saved` : `${billing.profiles.used} of ${slots} slots used${billing.profiles.extra ? ` · ${packName(billing.profiles)} pack` : ''}`}</span>
               </div>
               {people.map(p => (
-                <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)' }}>
+                <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)', opacity: p.disabled ? 0.55 : 1 }}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-                    <span style={{ fontSize: 14.5 }}>{p.firstName} {p.lastName}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.05em', color: 'rgba(244,236,220,.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dob(p.birthDate)} · {p.birthTime} · {p.city}{p.relationship && p.relationship !== 'self' ? ` · ${p.relationship}` : ''}</span>
+                    <span style={{ fontSize: 14.5 }}>{p.firstName} {p.lastName}{p.disabled && <span style={{ ...mono10, marginLeft: 8, color: GOLD }}>OFF</span>}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.05em', color: 'rgba(244,236,220,.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dob(p.birthDate)} · {p.birthTime} · {p.city}{p.relationship && p.relationship !== 'self' ? ` · ${p.relationship}` : ''} · {editsText(p.editsLeft)}</span>
                   </div>
-                  <Link to={`/synastry?with=${p._id}`} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>Open</Link>
-                  <button type="button" onClick={() => remove(p)} onBlur={() => setRemoving(null)} className="acc-remove" style={{ flex: '0 0 auto', border: 'none', background: 'transparent', color: removing === p._id ? RED : 'rgba(244,236,220,.4)', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer', padding: 4 }}>{removing === p._id ? 'Sure? Remove' : 'Remove'}</button>
+                  {!p.disabled && <Link to={`/synastry?with=${p._id}`} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>Open</Link>}
+                  {!p.disabled && p.editsLeft > 0 && <Link to={`/birth-details?id=${p._id}`} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>Edit</Link>}
+                  <button type="button" onClick={() => switchProfile(p)} disabled={switching === p._id} aria-pressed={!p.disabled} className="acc-toggle" style={{ flex: '0 0 auto', border: 'none', background: 'transparent', color: 'rgba(244,236,220,.45)', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer', padding: 4 }}>{switching === p._id ? '…' : p.disabled ? 'Switch on' : 'Switch off'}</button>
                 </div>
               ))}
               <button type="button" onClick={() => setAdding(true)} className="acc-quiet" style={{ ...quiet, alignSelf: 'flex-start', paddingTop: 14, fontSize: 10, letterSpacing: '.12em', color: 'rgba(244,236,220,.68)' }}>+ Add someone</button>
-            </section>
-
-            {/* ------------------------------------------------ notifications */}
-            <section style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .24s both' }}>
-              <div style={{ paddingBottom: 10, borderBottom: `1px solid ${INK}` }}>
-                <h2 style={h2}>Notifications</h2>
-              </div>
-              {NOTIFICATIONS.map(([key, label, note]) => {
-                const on = !!me.notifications[key];
-                return (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)' }}>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-                      <span style={{ fontSize: 14.5 }}>{label}</span>
-                      <span style={{ fontSize: 12, lineHeight: 1.45, color: 'rgba(244,236,220,.5)', textWrap: 'pretty' }}>{note}</span>
-                    </div>
-                    <button type="button" onClick={() => toggle(key)} aria-pressed={on} aria-label={label} style={{ flex: '0 0 auto', width: 46, height: 24, padding: 2, border: `1px solid ${on ? INK : 'rgba(244,236,220,.3)'}`, background: on ? 'rgba(244,236,220,.85)' : 'transparent', cursor: 'pointer', display: 'flex', justifyContent: on ? 'flex-end' : 'flex-start', transition: 'background .22s ease,border-color .22s ease' }}>
-                      <span style={{ width: 18, height: 18, background: on ? NAVY : 'rgba(244,236,220,.5)', display: 'block', transition: 'background .22s ease' }} />
-                    </button>
-                  </div>
-                );
-              })}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 0' }}>
-                <span style={{ flex: 1, fontSize: 14.5 }}>Delivery time</span>
-                <input className="acc-input" type="text" inputMode="numeric" value={delivery} onChange={e => setDelivery(formatTime(e.target.value))} onBlur={saveDelivery} aria-label="Delivery time" style={{ flex: '0 0 92px', textAlign: 'right', border: 'none', borderBottom: '1px solid rgba(244,236,220,.3)', background: 'transparent', padding: '3px 0', fontFamily: MONO, fontSize: 15, letterSpacing: '.06em', color: INK }} />
-              </div>
             </section>
 
             {/* ------------------------------------------------ plan */}

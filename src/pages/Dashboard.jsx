@@ -143,14 +143,15 @@ export default function Dashboard() {
 
   return (
     <div className="om-shell" style={{ minHeight: '100vh', background: '#1C2538', color: '#F4ECDC', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: "'Instrument Sans',Helvetica,Arial,sans-serif" }}>
-      <style>{CSS}</style>
+      {/* phones: the date line leaves the header for the hero, so the header fits one row */}
+      <style>{CSS + '.om-date-m{display:none}@media(max-width:600px){.om-date{display:none}.om-date-m{display:block}}'}</style>
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}><Starfield /></div>
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg,rgba(28,37,56,.35) 0%,rgba(28,37,56,.62) 55%,rgba(28,37,56,.82) 100%)' }} />
 
       <header className="om-header" style={{ position: 'relative', width: '100%', maxWidth: 1200, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 0' }}>
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 17, letterSpacing: '.16em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
+        <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 17, letterSpacing: '.16em', textTransform: 'uppercase', borderBottom: 'none', whiteSpace: 'nowrap' }}>AstroMeridian</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.5)' }}>{dateLine}</span>
+          <span className="om-date" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.5)' }}>{dateLine}</span>
           <NavMenu current="Home" />
         </div>
       </header>
@@ -159,6 +160,7 @@ export default function Dashboard() {
 
         <section className="om-hero" style={{ gridArea: 'hero', display: 'flex', flexDirection: 'column', gap: 26, animation: 'om-rise .6s cubic-bezier(.3,0,.2,1) .05s both' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <span className="om-date-m" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.5)' }}>{dateLine}</span>
             <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 400, fontSize: 42, lineHeight: 1.02, letterSpacing: '-.01em', textWrap: 'balance' }}>{greeting},<br /><em style={{ fontStyle: 'italic' }}>{profile.firstName}</em>.</h1>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 18px' }}>
               {placements.map(([body, sign]) => (

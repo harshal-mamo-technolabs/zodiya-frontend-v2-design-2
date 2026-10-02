@@ -21,6 +21,22 @@ export default function ChooseAstrologer() {
   const [loadingId, setLoadingId] = useState(null);
   const audio = useRef(null), tick = useRef(null);
 
+  /* Phones show the astrologers as a sideways row. The counter and arrows say
+     there are more to the right, and the row opens on the chosen one. */
+  const rail = useRef(null);
+  const [at, setAt] = useState(0);
+  const cardAt = i => rail.current && rail.current.children[i];
+  const centre = (i, behavior) => {
+    const el = cardAt(i), r = rail.current;
+    if (el) r.scrollTo({ left: el.offsetLeft - (r.clientWidth - el.clientWidth) / 2, behavior });
+  };
+  const onRail = () => {
+    const r = rail.current, first = cardAt(0), second = cardAt(1);
+    if (!first || !second) return;
+    setAt(Math.round(r.scrollLeft / (second.offsetLeft - first.offsetLeft)));
+  };
+  useEffect(() => { centre(CHARACTERS.findIndex(c => c.id === pick), 'instant'); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     getMe().catch(e => { if (e.status === 401) navigate('/login'); });
     const onPrefs = e => setPrefsState(e.detail || getPrefs());
@@ -80,7 +96,7 @@ export default function ChooseAstrologer() {
   return (
     <div className="ca-shell" style={{ minHeight: '100vh', background: 'radial-gradient(ellipse 80% 50% at 50% 0%,#26314B 0%,#1C2538 70%)', color: '#F4ECDC', position: 'relative', paddingBottom: 140 }}>
       <header className="ca-pad" style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 22px', borderBottom: '1px solid rgba(244,236,220,.2)' }}>
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
+        <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <NavMenu current="Your astrologer" />
       </header>
 
@@ -90,7 +106,17 @@ export default function ChooseAstrologer() {
         <p style={{ margin: 0, maxWidth: '56ch', fontSize: 15, lineHeight: 1.6, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Your astrologer lives in the corner of every page. Ask about your chart out loud or by text, and they’ll explain it with subtitles. They only talk about your own readings.</p>
       </section>
 
-      <div role="radiogroup" aria-label="Astrologers" className="ca-grid" style={{ maxWidth: 1280, margin: '0 auto' }}>
+      <div className="ca-nav ca-pad" style={{ maxWidth: 1280, margin: '0 auto', padding: '0 22px 10px', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.6)' }}>{at + 1} / {CHARACTERS.length} · Swipe to meet them all</span>
+        <span style={{ display: 'flex', gap: 8 }}>
+          {[['Previous astrologer', -1, '←'], ['Next astrologer', 1, '→']].map(([label, step, arrow]) => {
+            const off = step < 0 ? at === 0 : at === CHARACTERS.length - 1;
+            return <button key={label} type="button" aria-label={label} disabled={off} onClick={() => centre(at + step, 'smooth')} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid rgba(244,236,220,.35)', background: 'transparent', color: '#F4ECDC', fontSize: 16, cursor: off ? 'default' : 'pointer', opacity: off ? 0.3 : 1 }}>{arrow}</button>;
+          })}
+        </span>
+      </div>
+
+      <div ref={rail} onScroll={onRail} role="radiogroup" aria-label="Astrologers" className="ca-grid" style={{ maxWidth: 1280, margin: '0 auto', position: 'relative' }}>
         {CHARACTERS.map((ch, idx) => {
           const on = ch.id === pick, pl = playing && playing.id === ch.id, loading = loadingId === ch.id;
           const select = () => setPick(ch.id);

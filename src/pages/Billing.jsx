@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
-import { cancelPlan, getCard, listInvoices, resumePlan } from '../lib/api.js';
-import { cadence, euros, forgetStatus, getCatalog, getStatus, longDate } from '../lib/billing.js';
+import { cancelPlan, getCard, listInvoices, listProfiles, resumePlan } from '../lib/api.js';
+import { cadence, EDIT_LIMITS, editsText, euros, forgetStatus, getCatalog, getStatus, longDate, packName } from '../lib/billing.js';
 
 /* Plan, minutes, profiles, card and receipts, and a way to change each. */
 
@@ -43,6 +43,7 @@ export default function Billing() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [busy, setBusy] = useState(false);
   const [qty, setQty] = useState({});
+  const [people, setPeople] = useState(null);
 
   useEffect(() => {
     // renewals and calls change the numbers behind our back; always ask afresh here
@@ -51,6 +52,7 @@ export default function Billing() {
     getCatalog().then(setCatalog).catch(e => setError(e.message));
     getCard().then(r => setCard(r.card)).catch(() => setCard(null));
     listInvoices().then(setInvoices).catch(() => setInvoices([]));
+    listProfiles(true).then(setPeople).catch(() => setPeople([]));
   }, [navigate]);
 
   const toggleCancel = async cancel => {
@@ -64,7 +66,6 @@ export default function Billing() {
   const tier = plan && catalog && catalog.plans.find(p => p.tier === plan.tier);
   const failed = plan && (plan.status === 'past_due' || plan.status === 'unpaid');
   const allowance = plan && catalog ? (plan.trial ? catalog.trial.minutes : tier ? tier.minutes : 0) * 60 : 0;
-  const slotsFailed = status && (status.profiles.status === 'past_due' || status.profiles.status === 'unpaid');
 
   return (
     <div style={{ minHeight: '100vh', background: NAVY, color: INK, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', fontFamily: "'Instrument Sans',Helvetica,Arial,sans-serif" }}>
@@ -73,8 +74,7 @@ export default function Billing() {
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.72)' }} />
 
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
-        <Link to="/account" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>← Account</Link>
-        <Link to="/" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
+        <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <NavMenu current="Plan & billing" />
       </header>
 
@@ -173,22 +173,7 @@ export default function Billing() {
             </section>
 
             {/* -------------------------------------------------- profiles */}
-            <section style={section(0.15)}>
-              <div style={head}><h2 style={h2}>Profiles</h2><span style={mono10}>{status.profiles.used} of {status.profiles.included + status.profiles.extra} in use</span></div>
-              <div style={row}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <span style={{ fontSize: 14.5 }}>{status.profiles.extra ? `${status.profiles.extra} extra ${status.profiles.extra === 1 ? 'profile' : 'profiles'} · ${euros(status.profiles.extra * catalog.profileSlot.amount)} a month` : 'Your own profile, included'}</span>
-                  <span style={mono10}>Each extra profile is {euros(catalog.profileSlot.amount)} a month. Removing one lowers the next invoice.</span>
-                </div>
-                {status.entitled && <Link to="/checkout?item=profile" className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>Add one</Link>}
-              </div>
-              {slotsFailed && (
-                <div style={{ ...row, borderLeft: `2px solid ${RED}`, paddingLeft: 12 }}>
-                  <span style={{ flex: 1, fontSize: 14 }}>The last payment for extra profiles failed; they are locked until it is paid.</span>
-                  <Link to="/checkout?item=invoice&kind=profiles" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>Pay now</Link>
-                </div>
-              )}
-            </section>
+            <ProfilesSection status={status} catalog={catalog} people={people} />
 
             {/* ----------------------------------------------- payment card */}
             <section style={section(0.2)}>
@@ -218,5 +203,84 @@ export default function Billing() {
         )}
       </main>
     </div>
+  );
+}
+
+const PROFILE_RULES = [
+  'Your own profile comes with every plan. Packs add room for other people.',
+  'One pack at a time. Moving up charges the difference for the rest of this month; moving down credits it. Your billing date stays the same.',
+  'Saved people stay on your account for good; they cannot be deleted. Switch someone off to hide them. They keep their slot, and you can switch them back on.',
+  `Details are fixed once saved: your own profile can be corrected ${EDIT_LIMITS.primary} times, each saved person once. The portrait and relationship are free to change.`,
+  'A pack renews monthly and ends with your plan.'
+];
+
+/* The profile pack, how its slots are used, the way up or down, and the rules behind it. */
+function ProfilesSection({ status, catalog, people }) {
+  const p = status.profiles;
+  const slots = p.included + p.extra;
+  const current = catalog.profilePacks.find(x => x.id === p.pack);
+  const extras = people ? people.filter(x => !x.isPrimary) : [];
+  const off = extras.filter(x => x.disabled).length;
+  const own = people && people.find(x => x.isPrimary);
+  const failed = p.status === 'past_due' || p.status === 'unpaid';
+  const sub = { fontSize: 12.5, lineHeight: 1.55, color: MUTED, textWrap: 'pretty' };
+
+  return (
+    <section style={section(0.15)}>
+      <div style={head}><h2 style={h2}>Profiles</h2><span style={mono10}>{p.used} of {slots} slots used</span></div>
+
+      {/* the pack you pay for */}
+      <div style={row}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <span style={{ fontSize: 14.5 }}>{current ? `${packName(current)} pack · ${euros(current.amount)} a month` : 'No profile pack'}</span>
+          <span style={mono10}>{current ? `Room for ${slots} profiles, your own included` : 'Your own profile is included with your plan'}</span>
+        </div>
+      </div>
+
+      {/* how the slots are used */}
+      <div style={{ display: 'flex', gap: 3, padding: '14px 0 6px' }} aria-hidden="true">
+        {Array.from({ length: Math.max(slots, p.used) }, (_, i) => (
+          <span key={i} style={{ flex: 1, height: 6, background: i === 0 ? INK : i < p.used - off ? SAGE : i < p.used ? 'rgba(180,147,63,.6)' : 'rgba(244,236,220,.15)' }} />
+        ))}
+      </div>
+      <div style={{ ...row, flexWrap: 'wrap', gap: '4px 18px', ...mono10 }}>
+        <span>Yours · 1</span>
+        <span style={{ color: SAGE }}>Saved, on · {extras.length - off}</span>
+        <span style={{ color: GOLD }}>Switched off · {off}</span>
+        <span>Free · {Math.max(0, slots - p.used)}</span>
+        {own && <span style={{ marginLeft: 'auto' }}>Your details · {editsText(own.editsLeft).toLowerCase()}</span>}
+      </div>
+
+      {failed && (
+        <div style={{ ...row, borderLeft: `2px solid ${RED}`, paddingLeft: 12 }}>
+          <span style={{ flex: 1, fontSize: 14 }}>The last payment for your profile pack failed. Pay it to keep your pack.</span>
+          <Link to="/checkout?item=invoice&kind=profiles" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>Pay now</Link>
+        </div>
+      )}
+
+      {/* the way up or down */}
+      {catalog.profilePacks.map(pack => {
+        const mine = p.pack === pack.id;
+        const up = !current || pack.extra > current.extra;
+        // profiles are never deleted, so a smaller pack must still hold them all
+        const fits = p.included + pack.extra >= p.used;
+        return (
+          <div key={pack.id} style={row}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 14.5 }}>{packName(pack)} · {euros(pack.amount)} a month</span>
+              <span style={mono10}>{mine ? 'Your pack' : !fits ? `Holds ${p.included + pack.extra} profiles; you have ${p.used}` : current ? `${up ? 'Charged' : 'Credited'} the difference today, pro rata` : `Room for ${p.included + pack.extra} profiles`}</span>
+            </div>
+            {mine ? <span style={{ ...mono10, color: SAGE }}>Current</span>
+              : status.entitled && fits && <Link to={`/checkout?item=profiles&pack=${pack.id}`} className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{!current ? 'Choose' : up ? 'Upgrade' : 'Downgrade'}</Link>}
+          </div>
+        );
+      })}
+
+      {/* the rules */}
+      <ul style={{ listStyle: 'none', margin: 0, padding: '14px 0 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {PROFILE_RULES.map(r => <li key={r} style={{ display: 'flex', gap: 10, ...sub }}><span style={{ fontFamily: MONO, color: SAGE }}>·</span><span>{r}</span></li>)}
+      </ul>
+      <Link to="/account" style={{ alignSelf: 'flex-start', marginTop: 12, ...mono10, textTransform: 'uppercase', letterSpacing: '.12em', borderBottom: '1px solid rgba(244,236,220,.3)' }}>Manage saved people</Link>
+    </section>
   );
 }

@@ -4,7 +4,7 @@ import { avatarImage } from '../lib/assets.js';
 import { listProfiles, logout } from '../lib/api.js';
 import { clearActive, readActive, writeActive } from '../lib/active-profile.js';
 import ProfileForm from './ProfileForm.jsx';
-import { euros, forgetStatus, getCatalog, getStatus } from '../lib/billing.js';
+import { euros, forgetStatus, getCatalog, getStatus, packName } from '../lib/billing.js';
 
 
 const GROUPS = [
@@ -22,14 +22,16 @@ const stop = e => e.stopPropagation();
    page reloads the same way a switch does so every reading follows it. */
 export function AddProfile({ onClose }) {
   const navigate = useNavigate();
-  // null while checking; false means every paid slot is in use
+  // null while checking; false means every slot in the current pack is in use
   const [free, setFree] = useState(null);
-  const [price, setPrice] = useState(null);
+  const [extra, setExtra] = useState(0);
+  const [packs, setPacks] = useState([]);
   useEffect(() => {
     forgetStatus();
-    getStatus().then(s => setFree(s.profiles.used < s.profiles.included + s.profiles.extra)).catch(() => setFree(true));
-    getCatalog().then(c => setPrice(c.profileSlot.amount)).catch(() => {});
+    getStatus().then(s => { setExtra(s.profiles.extra); setFree(s.profiles.used < s.profiles.included + s.profiles.extra); }).catch(() => setFree(true));
+    getCatalog().then(c => setPacks(c.profilePacks)).catch(() => {});
   }, []);
+  const bigger = packs.filter(p => p.extra > extra);
 
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose(); };
@@ -46,18 +48,21 @@ export function AddProfile({ onClose }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: '#5F8B7A' }}>New entry</span>
             <h2 style={{ margin: 0, fontFamily: "'Cormorant Garamond',Georgia,serif", fontWeight: 500, fontSize: 'clamp(26px,5vw,34px)', lineHeight: 1.1, textWrap: 'balance' }}>Add someone to your logbook.</h2>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: 'rgba(244,236,220,.68)', textWrap: 'pretty' }}>Their chart, transits and numbers, kept beside yours. You can switch between entries from the portrait in the header.</p>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: 'rgba(244,236,220,.68)', textWrap: 'pretty' }}>Their chart, transits and numbers, kept beside yours. You can switch between entries from the portrait in the header. Check the details before saving: a saved person stays on your account for good and can be corrected once.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" style={{ width: 28, height: 28, flex: '0 0 auto', background: 'transparent', border: 'none', color: '#F4ECDC', fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: 0 }}>×</button>
         </div>
         {free === true && <ProfileForm withRelationship submitLabel="Add profile" busyLabel="Saving…" onSaved={() => window.location.reload()} />}
         {free === false && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, borderTop: '1px solid rgba(244,236,220,.2)', paddingTop: 18 }}>
-            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: '#B4933F' }}>Extra profile{price != null ? ` · ${euros(price)} a month` : ''}</span>
-            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Your own profile is included in your plan. Every other person is an extra profile, billed monthly for as long as you keep them.</p>
-            <button type="button" onClick={() => { onClose(); navigate('/checkout?item=profile'); }} className="hov-cream" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 50, padding: '0 16px 0 18px', background: '#F4ECDC', color: '#1C2538', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 15 }}>
-              <span>Add a profile{price != null ? ` for ${euros(price)}/month` : ''}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
-            </button>
+            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: '#B4933F' }}>Profile packs · monthly</span>
+            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>{extra ? `Every slot in your ${packName({ extra })} pack is in use. Move to a bigger pack to add someone new.` : 'Your own profile is included in your plan. To add other people, choose a monthly profile pack.'}</p>
+            {bigger.length === 0 && packs.length > 0 && <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'rgba(244,236,220,.68)' }}>You already have the largest pack and every slot is taken. Switched-off people keep their slot.</p>}
+            {bigger.map(p => (
+              <button key={p.id} type="button" onClick={() => { onClose(); navigate(`/checkout?item=profiles&pack=${p.id}&next=${encodeURIComponent('/account?add=1')}`); }} className="hov-cream" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 50, padding: '0 16px 0 18px', background: '#F4ECDC', color: '#1C2538', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 15 }}>
+                <span>{packName(p)} · {euros(p.amount)}/month</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -92,7 +97,8 @@ export default function NavMenu({ current = '' }) {
   const active = profiles.find(p => p._id === activeId) || profiles[0] || { name: 'You' };
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+    // never squeezed: on a narrow header this is the one thing that must stay visible
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
       <div style={{ position: 'relative' }}>
         <button type="button" onClick={() => setProfileOpen(o => !o)} aria-label="Switch profile" className="hov-wash-20" style={{ width: 30, height: 30, flex: '0 0 auto', borderRadius: '50%', overflow: 'hidden', background: 'rgba(244,236,220,.12)', border: '1px solid rgba(244,236,220,.4)', color: '#F4ECDC', fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>
           {active.avatar
