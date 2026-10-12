@@ -6,17 +6,23 @@ import { getStatus } from '../lib/billing.js';
 import { readActive } from '../lib/active-profile.js';
 import { READINGS, SUB_PX, byId, getPrefs, setPrefs } from '../lib/astrologers.js';
 import { useAstrologer } from '../lib/useAstrologer.js';
+import { t } from '../i18n/index.js';
 
 /* The AI astrologer that follows the reader round the app: a draggable
    figure that snaps to either edge, steps out of the way of buttons, and
    opens into a chat panel. Ported from the design's Astrologer Widget. */
 
-const HIDDEN_ON = [/^\/$/, /^\/login/, /^\/signup/, /^\/chart\//, /^\/subscription/, /^\/checkout/];
+const HIDDEN_ON = [/^\/$/, /^\/login/, /^\/signup/, /^\/chart\//, /^\/subscription/, /^\/checkout/, /^\/support/];
 const SANS = "'DM Sans',system-ui,sans-serif";
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',serif";
 const INK = '#EFEAE0', SOFT = '#B9BDCB', DIM = '#8A90A6', GOLD = '#D4B26A', PANEL = '#0E1226';
 const SUGG = ['Explain my Sun sign', 'What does my 7th house mean?', 'Summarize my natal chart', 'Tell me about my Moon', "What's today's sky doing?"];
+// questions that fit the page the reader is on; anywhere else gets SUGG
+const PAGE_SUGG = {
+  astrocartography: ['Where should I live for love?', 'What would Lisbon bring me?', 'Which city is best for my career?', 'Explain my birthplace lines'],
+  'palm-reading': ['What did my palm reading say?', 'Explain my heart line', 'How do I take a good palm photo?', 'What does my life line mean?']
+};
 const ERR = {
   mic: ['Microphone blocked', "I can't hear you yet. Allow microphone access from the icon in your browser's address bar, or type your question instead."],
   unsupported: ['Voice input unavailable', "This browser can't use the microphone here. Type your question and I'll still answer."],
@@ -279,7 +285,8 @@ export default function AstrologerWidget() {
   };
   const submit = e => { e.preventDefault(); const q = input; setInput(''); astro.ask(q); };
 
-  if (!onPage || !signedIn) return null;
+  // nothing to talk about before the first birth details are saved
+  if (!onPage || !signedIn || !profileId) return null;
   // the choose page is the introduction; the card would only cover it
   if (view === 'onboard' && pathname === '/choose-astrologer') return null;
 
@@ -310,27 +317,28 @@ export default function AstrologerWidget() {
   }
 
   const [stateLabel, stateColor] = STATE_UI[aState] || STATE_UI.idle;
-  const e = ERR[err] || ERR.offline;
+  const e = (ERR[err] || ERR.offline).map(x => t(x));
   const subs = prefs.subs !== false;
   const subPx = SUB_PX[prefs.subSize] || SUB_PX.M;
   let cardEyebrow = ch.name, cardText = '', cardTextColor = INK;
-  if (aState === 'listening') { cardEyebrow = 'Listening'; cardText = interim ? `“${interim}…”` : "Just talk. I'll answer when you pause."; cardTextColor = interim ? INK : SOFT; }
-  else if (aState === 'connecting') { cardEyebrow = 'Connecting'; cardText = `Getting ${ch.name} on the line. Start talking once the switch turns green.`; cardTextColor = SOFT; }
-  else if (aState === 'thinking') { cardEyebrow = 'Thinking'; cardText = 'Reading your chart…'; cardTextColor = SOFT; }
+  if (aState === 'listening') { cardEyebrow = t('Listening'); cardText = interim ? `“${interim}…”` : t("Just talk. I'll answer when you pause."); cardTextColor = interim ? INK : SOFT; }
+  else if (aState === 'connecting') { cardEyebrow = t('Connecting'); cardText = t('Getting {name} on the line. Start talking once the switch turns green.', { name: ch.name }); cardTextColor = SOFT; }
+  else if (aState === 'thinking') { cardEyebrow = t('Thinking'); cardText = t('Reading your chart…'); cardTextColor = SOFT; }
   else if (aState === 'error') { cardEyebrow = e[0]; cardText = e[1]; cardTextColor = '#E4E0D8'; }
-  else if (aState === 'speaking' && !subs) cardEyebrow = `${ch.name} · subtitles off`;
-  const stageText = aState === 'idle' ? 'Start a conversation or type below. I can explain anything in your own readings.' : cardText;
+  else if (aState === 'speaking' && !subs) cardEyebrow = t('{name} · subtitles off', { name: ch.name });
+  const stageText = aState === 'idle' ? t('Start a conversation or type below. I can explain anything in your own readings.') : cardText;
   const showWords = aState === 'speaking' && subs && caption && caption.words.length > 0;
   const showCard = view === 'bubble' && aState !== 'idle';
   const cardAnim = aState === 'listening' || aState === 'speaking' ? <Anim kind="wave" color={stateColor} reduced={reduced} /> : aState === 'thinking' || aState === 'connecting' ? <Anim kind="dots" color={stateColor} reduced={reduced} /> : null;
   const pulse = inset => (aState === 'listening' && !reduced ? <span aria-hidden="true" style={{ position: 'absolute', inset, borderRadius: '50%', border: '2px solid #7FD4C8', animation: 'astro-pulse 1.4s ease-out infinite', pointerEvents: 'none' }} /> : null);
-  const liveText = aState === 'error' ? `${e[0]}. ${e[1]}` : aState === 'speaking' && caption ? caption.words.join(' ') : aState === 'listening' ? 'Listening' : aState === 'thinking' ? 'Thinking' : aState === 'connecting' ? 'Connecting' : '';
+  const liveText = aState === 'error' ? `${e[0]}. ${e[1]}` : aState === 'speaking' && caption ? caption.words.join(' ') : aState === 'listening' ? t('Listening') : aState === 'thinking' ? t('Thinking') : aState === 'connecting' ? t('Connecting') : '';
   const busy = aState === 'speaking';
+  const [hidPre, hidPost = ''] = t('{name} is hidden. Bring them back from {link} in the menu.', { name: ch.name }).split('{link}');
 
   // on/off for the whole conversation: the mic stays open while it is on
   const connecting = aState === 'connecting';
   const liveSwitch = wide => (
-    <button type="button" role="switch" aria-checked={live} aria-busy={connecting} disabled={connecting} className="astro-focus" onClick={toggleLive} title={connecting ? 'Connecting…' : live ? 'End the conversation' : `Start talking with ${ch.name}`} style={{ cursor: connecting ? 'progress' : 'pointer', display: 'flex', alignItems: 'center', gap: 10, height: wide ? 48 : 40, padding: '0 14px 0 6px', flex: wide ? 1 : '0 0 auto', borderRadius: 999, border: `1px solid ${live || connecting ? 'rgba(127,212,200,.55)' : 'rgba(212,178,106,.45)'}`, background: live ? 'rgba(127,212,200,.12)' : connecting ? 'rgba(127,212,200,.06)' : 'rgba(14,18,38,.9)', color: INK, font: `500 ${wide ? 14 : 13}px ${SANS}`, whiteSpace: 'nowrap', boxShadow: '0 6px 20px rgba(0,0,0,.35)' }}>
+    <button type="button" role="switch" aria-checked={live} aria-busy={connecting} disabled={connecting} className="astro-focus" onClick={toggleLive} title={connecting ? t('Connecting…') : live ? t('End the conversation') : t('Start talking with {name}', { name: ch.name })} style={{ cursor: connecting ? 'progress' : 'pointer', display: 'flex', alignItems: 'center', gap: 10, height: wide ? 48 : 40, padding: '0 14px 0 6px', flex: wide ? 1 : '0 0 auto', borderRadius: 999, border: `1px solid ${live || connecting ? 'rgba(127,212,200,.55)' : 'rgba(212,178,106,.45)'}`, background: live ? 'rgba(127,212,200,.12)' : connecting ? 'rgba(127,212,200,.06)' : 'rgba(14,18,38,.9)', color: INK, font: `500 ${wide ? 14 : 13}px ${SANS}`, whiteSpace: 'nowrap', boxShadow: '0 6px 20px rgba(0,0,0,.35)' }}>
       <span aria-hidden="true" style={{ position: 'relative', width: 44, height: 26, flexShrink: 0, borderRadius: 13, background: live ? '#7FD4C8' : 'rgba(239,234,224,.18)', transition: 'background .25s ease' }}>
         <span style={{ position: 'absolute', top: 3, left: live ? 21 : connecting ? 12 : 3, width: 20, height: 20, borderRadius: '50%', background: live ? '#07091A' : connecting ? 'rgba(127,212,200,.25)' : GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', color: live ? '#7FD4C8' : '#07091A', transition: reduced ? 'none' : 'left .25s cubic-bezier(.3,1.3,.5,1)' }}>
           {connecting
@@ -338,13 +346,13 @@ export default function AstrologerWidget() {
             : <MicIcon size={12} />}
         </span>
       </span>
-      {connecting ? 'Connecting…' : live ? 'End conversation' : wide ? `Talk with ${ch.name}` : 'Talk'}
+      {connecting ? t('Connecting…') : live ? t('End conversation') : wide ? t('Talk with {name}', { name: ch.name }) : t('Talk')}
     </button>
   );
 
   const ctrls = [
-    { label: prefs.voiceOn ? 'Mute' : 'Unmute', aria: prefs.voiceOn ? 'Mute voice' : 'Unmute voice', d: prefs.voiceOn ? ['M4 9h4l5-4v14l-5-4H4z', 'M16.5 9a4 4 0 0 1 0 6', 'M19 6.5a8 8 0 0 1 0 11'] : ['M4 9h4l5-4v14l-5-4H4z', 'M16 9l5 6M21 9l-5 6'], onClick: () => { astro.stop(); save({ voiceOn: !prefs.voiceOn }); }, pressed: !prefs.voiceOn, bg: prefs.voiceOn ? 'transparent' : 'rgba(239,234,224,.08)' },
-    { label: 'CC', aria: subs ? 'Turn subtitles off' : 'Turn subtitles on', d: ['M3 6h18v12H3z', 'M10 10.5a2 2 0 1 0 0 3', 'M17 10.5a2 2 0 1 0 0 3'], onClick: () => save({ subs: !subs }), pressed: subs, border: subs ? 'rgba(212,178,106,.5)' : undefined, color: subs ? '#EBD39A' : SOFT },
+    { label: t(prefs.voiceOn ? 'Mute' : 'Unmute'), aria: t(prefs.voiceOn ? 'Mute voice' : 'Unmute voice'), d: prefs.voiceOn ? ['M4 9h4l5-4v14l-5-4H4z', 'M16.5 9a4 4 0 0 1 0 6', 'M19 6.5a8 8 0 0 1 0 11'] : ['M4 9h4l5-4v14l-5-4H4z', 'M16 9l5 6M21 9l-5 6'], onClick: () => { astro.stop(); save({ voiceOn: !prefs.voiceOn }); }, pressed: !prefs.voiceOn, bg: prefs.voiceOn ? 'transparent' : 'rgba(239,234,224,.08)' },
+    { label: t('Subtitles'), aria: t(subs ? 'Turn subtitles off' : 'Turn subtitles on'), d: ['M3 6h18v12H3z', 'M10 10.5a2 2 0 1 0 0 3', 'M17 10.5a2 2 0 1 0 0 3'], onClick: () => save({ subs: !subs }), pressed: subs, border: subs ? 'rgba(212,178,106,.5)' : undefined, color: subs ? '#EBD39A' : SOFT },
   ];
 
   const cardW = 'min(340px, calc(100vw - 24px))';
@@ -356,27 +364,27 @@ export default function AstrologerWidget() {
       <div role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>{liveText}</div>
 
       {!prefs.hidden && (
-        <div ref={boxRef} role="region" aria-label={`${ch.name}, your AI astrologer`} onKeyDown={ev => { if (ev.key === 'Escape' && view === 'panel') { ev.stopPropagation(); collapse(); } }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} style={{ ...pos, zIndex: 900 }}>
+        <div ref={boxRef} role="region" aria-label={t('{name}, your AI astrologer', { name: ch.name })} onKeyDown={ev => { if (ev.key === 'Escape' && view === 'panel') { ev.stopPropagation(); collapse(); } }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} style={{ ...pos, zIndex: 900 }}>
 
           {view === 'bubble' && (
             <div style={{ display: 'flex', flexDirection: side === 'right' ? 'row-reverse' : 'row', alignItems: upper ? 'flex-start' : 'flex-end', gap: 12, maxWidth: `calc(100vw - ${2 * M}px)` }}>
               <div ref={hitRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <div style={{ position: 'relative', width: avW, height: avH }}>
                   {pulse('18% 12% 4%')}
-                  <button type="button" className="astro-focus" onPointerDown={onPointerDown} onClick={onAvatarClick} onKeyDown={onHandleKey} aria-label={`${ch.name}, your astrologer. Click to open the conversation. Drag, or use arrow keys, to move.`} title="Drag to move · click to open" style={{ position: 'absolute', inset: 0, margin: 0, padding: 0, border: 0, background: 'transparent', cursor: anchor === 'drag' ? 'grabbing' : 'grab', touchAction: 'none', borderRadius: 36 }}>
+                  <button type="button" className="astro-focus" onPointerDown={onPointerDown} onClick={onAvatarClick} onKeyDown={onHandleKey} aria-label={t('{name}, your astrologer. Click to open the conversation. Drag, or use arrow keys, to move.', { name: ch.name })} title={t('Drag to move · click to open')} style={{ position: 'absolute', inset: 0, margin: 0, padding: 0, border: 0, background: 'transparent', cursor: anchor === 'drag' ? 'grabbing' : 'grab', touchAction: 'none', borderRadius: 36 }}>
                     <Figure id={ch.id} state={aState === 'connecting' ? 'thinking' : aState} reduced={reduced} />
                   </button>
                   <div style={{ position: 'absolute', top: 0, right: -8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <button type="button" className="astro-hov astro-focus" onClick={minimize} aria-label="Minimize astrologer" title="Minimize" style={round(26)}><Icon d={['M6 12h12']} /></button>
-                    <button type="button" className="astro-hov astro-focus" onClick={hide} aria-label="Hide astrologer" title="Hide" style={round(26)}><Icon d={['M7 7l10 10M17 7L7 17']} /></button>
+                    <button type="button" className="astro-hov astro-focus" onClick={minimize} aria-label={t('Minimize astrologer')} title={t('Minimize')} style={round(26)}><Icon d={['M6 12h12']} /></button>
+                    <button type="button" className="astro-hov astro-focus" onClick={hide} aria-label={t('Hide astrologer')} title={t('Hide')} style={round(26)}><Icon d={['M7 7l10 10M17 7L7 17']} /></button>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, font: `500 10px ${MONO}`, letterSpacing: '.12em', textTransform: 'uppercase', color: stateColor }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateColor, boxShadow: `0 0 8px ${stateColor}` }} />{stateLabel}
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateColor, boxShadow: `0 0 8px ${stateColor}` }} />{t(stateLabel)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {liveSwitch(false)}
-                  <button type="button" className="astro-focus" onClick={openPanel} aria-label="Open conversation" title="Conversation" style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid rgba(239,234,224,.22)', background: 'rgba(14,18,38,.9)', color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>
+                  <button type="button" className="astro-focus" onClick={openPanel} aria-label={t('Open conversation')} title={t('Conversation')} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid rgba(239,234,224,.22)', background: 'rgba(14,18,38,.9)', color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" style={{ fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinejoin: 'round' }}><path d="M4 5h16v11H10l-6 4z" /></svg>
                   </button>
                 </div>
@@ -392,18 +400,18 @@ export default function AstrologerWidget() {
                   {!showWords && cardText && <div style={{ font: `400 ${subPx}/1.45 ${SANS}`, color: cardTextColor, textWrap: 'pretty' }}>{cardText}</div>}
                   {aState === 'error' && (PAID_FIX[err] ? (
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <Link to={PAID_FIX[err][1]} onClick={astro.reset} className="astro-focus" style={pill({ border: 0, background: GOLD, color: '#07091A', borderBottom: 'none' })}>{PAID_FIX[err][0]}</Link>
+                      <Link to={PAID_FIX[err][1]} onClick={astro.reset} className="astro-focus" style={pill({ border: 0, background: GOLD, color: '#07091A', borderBottom: 'none' })}>{t(PAID_FIX[err][0])}</Link>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button type="button" className="astro-focus" onClick={typeInstead} style={pill({ border: 0, background: GOLD, color: '#07091A' })}>Type instead</button>
-                      <button type="button" className="astro-focus" onClick={retry} style={pill()}>Try again</button>
+                      <button type="button" className="astro-focus" onClick={typeInstead} style={pill({ border: 0, background: GOLD, color: '#07091A' })}>{t('Type instead')}</button>
+                      <button type="button" className="astro-focus" onClick={retry} style={pill()}>{t('Try again')}</button>
                     </div>
                   ))}
                   {busy && (
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button type="button" className="astro-focus" onClick={astro.stop} aria-label="Stop speaking" style={pill({ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', font: `400 12px ${SANS}`, border: '1px solid rgba(239,234,224,.2)' })}><Icon d={['M5 5h14v14H5z']} size={12} fill />Stop</button>
-                      <button type="button" className="astro-focus" onClick={openPanel} style={pill({ padding: '6px 11px', font: `400 12px ${SANS}`, border: '1px solid rgba(239,234,224,.2)' })}>Open chat</button>
+                      <button type="button" className="astro-focus" onClick={astro.stop} aria-label={t('Stop speaking')} style={pill({ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', font: `400 12px ${SANS}`, border: '1px solid rgba(239,234,224,.2)' })}><Icon d={['M5 5h14v14H5z']} size={12} fill />{t('Stop')}</button>
+                      <button type="button" className="astro-focus" onClick={openPanel} style={pill({ padding: '6px 11px', font: `400 12px ${SANS}`, border: '1px solid rgba(239,234,224,.2)' })}>{t('Open chat')}</button>
                     </div>
                   )}
                 </div>
@@ -412,7 +420,7 @@ export default function AstrologerWidget() {
           )}
 
           {view === 'mini' && (
-            <button type="button" ref={hitRef} className="astro-focus" onPointerDown={onPointerDown} onClick={restore} onKeyDown={onHandleKey} aria-label={`Open ${ch.name}. Drag or use arrow keys to move.`} title="Open astrologer" style={{ position: 'relative', width: 58, height: 58, borderRadius: '50%', padding: 0, border: '1px solid rgba(212,178,106,.55)', background: 'radial-gradient(circle at 50% 35%,#1E2548,#0A0E1C 75%)', cursor: anchor === 'drag' ? 'grabbing' : 'grab', touchAction: 'none', boxShadow: '0 10px 30px rgba(0,0,0,.5),0 0 18px rgba(212,178,106,.18)' }}>
+            <button type="button" ref={hitRef} className="astro-focus" onPointerDown={onPointerDown} onClick={restore} onKeyDown={onHandleKey} aria-label={t('Open {name}. Drag or use arrow keys to move.', { name: ch.name })} title={t('Open astrologer')} style={{ position: 'relative', width: 58, height: 58, borderRadius: '50%', padding: 0, border: '1px solid rgba(212,178,106,.55)', background: 'radial-gradient(circle at 50% 35%,#1E2548,#0A0E1C 75%)', cursor: anchor === 'drag' ? 'grabbing' : 'grab', touchAction: 'none', boxShadow: '0 10px 30px rgba(0,0,0,.5),0 0 18px rgba(212,178,106,.18)' }}>
               <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', overflow: 'hidden' }}><Figure id={ch.id} state={aState === 'connecting' ? 'thinking' : aState} reduced={reduced} framing="face" /></div>
               <span style={{ position: 'absolute', right: 1, bottom: 3, width: 12, height: 12, borderRadius: '50%', background: stateColor, border: '2px solid #0A0E1C' }} />
             </button>
@@ -421,14 +429,14 @@ export default function AstrologerWidget() {
           {view === 'onboard' && (
             <div style={{ width: cardW, borderRadius: 24, background: 'linear-gradient(180deg,#151B3A,#0E1226 60%)', border: '1px solid rgba(212,178,106,.3)', boxShadow: '0 30px 80px rgba(0,0,0,.6)', padding: '22px 22px 20px', display: 'flex', flexDirection: 'column', gap: 14, animation: 'astro-in .45s cubic-bezier(.2,.7,.2,1) both' }}>
               <div style={{ alignSelf: 'center', width: 150, height: 170 }}><Figure id={ch.id} state="idle" reduced={reduced} /></div>
-              <div style={{ font: `400 11px ${MONO}`, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>New · Your AI astrologer</div>
-              <div style={{ font: `400 30px/1.05 ${SERIF}`, color: INK }}>Meet {ch.name}</div>
-              <div style={{ font: `400 15px/1.55 ${SANS}`, color: SOFT, textWrap: 'pretty' }}>{ch.tagline} Ask about your chart, houses and today's sky, out loud or by typing. I only talk about your own readings.</div>
+              <div style={{ font: `400 11px ${MONO}`, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>{t('New · Your AI astrologer')}</div>
+              <div style={{ font: `400 30px/1.05 ${SERIF}`, color: INK }}>{t('Meet {name}', { name: ch.name })}</div>
+              <div style={{ font: `400 15px/1.55 ${SANS}`, color: SOFT, textWrap: 'pretty' }}>{t(ch.tagline)} {t("Ask about your chart, houses and today's sky, out loud or by typing. I only talk about your own readings.")}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
-                <button type="button" className="astro-focus" onClick={onboardNext} style={pill({ padding: '13px 18px', border: 0, background: GOLD, color: '#07091A', font: `500 15px ${SANS}` })}>Say hello</button>
+                <button type="button" className="astro-focus" onClick={onboardNext} style={pill({ padding: '13px 18px', border: 0, background: GOLD, color: '#07091A', font: `500 15px ${SANS}` })}>{t('Say hello')}</button>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                  <Link to="/choose-astrologer" style={{ font: `400 13px ${SANS}`, color: GOLD, padding: '6px 0', borderBottom: 'none' }}>Choose a different astrologer</Link>
-                  <button type="button" className="astro-hov astro-focus" onClick={notNow} style={{ border: 0, background: 'transparent', color: DIM, font: `400 13px ${SANS}`, cursor: 'pointer', padding: '6px 0' }}>Not now</button>
+                  <Link to="/choose-astrologer" style={{ font: `400 13px ${SANS}`, color: GOLD, padding: '6px 0', borderBottom: 'none' }}>{t('Choose a different astrologer')}</Link>
+                  <button type="button" className="astro-hov astro-focus" onClick={notNow} style={{ border: 0, background: 'transparent', color: DIM, font: `400 13px ${SANS}`, cursor: 'pointer', padding: '6px 0' }}>{t('Not now')}</button>
                 </div>
               </div>
             </div>
@@ -440,13 +448,13 @@ export default function AstrologerWidget() {
                 <div style={{ width: 64, height: 72, flexShrink: 0 }}><Figure id={ch.id} state="listening" reduced={reduced} framing="face" /></div>
                 <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(127,212,200,.14)', border: '1px solid rgba(127,212,200,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7FD4C8' }}><MicIcon size={22} /></div>
               </div>
-              <div style={{ font: `400 28px/1.08 ${SERIF}`, color: INK }}>Can {ch.name} hear you?</div>
-              <div style={{ font: `400 15px/1.55 ${SANS}`, color: SOFT, textWrap: 'pretty' }}>AstroMeridian uses your microphone only while a conversation is on, so {ch.name} can hear your question. Nothing is kept after the conversation.</div>
+              <div style={{ font: `400 28px/1.08 ${SERIF}`, color: INK }}>{t('Can {name} hear you?', { name: ch.name })}</div>
+              <div style={{ font: `400 15px/1.55 ${SANS}`, color: SOFT, textWrap: 'pretty' }}>{t('AstroMeridian uses your microphone only while a conversation is on, so {name} can hear your question. Nothing is kept after the conversation.', { name: ch.name })}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
-                <button type="button" className="astro-focus" onClick={allowMic} style={pill({ padding: '13px 18px', border: 0, background: '#7FD4C8', color: '#07091A', font: `500 15px ${SANS}` })}>Allow microphone</button>
-                <button type="button" className="astro-focus" onClick={typeInstead} style={pill({ padding: '12px 18px', border: '1px solid rgba(239,234,224,.22)', font: `500 15px ${SANS}` })}>I'll type instead</button>
+                <button type="button" className="astro-focus" onClick={allowMic} style={pill({ padding: '13px 18px', border: 0, background: '#7FD4C8', color: '#07091A', font: `500 15px ${SANS}` })}>{t('Allow microphone')}</button>
+                <button type="button" className="astro-focus" onClick={typeInstead} style={pill({ padding: '12px 18px', border: '1px solid rgba(239,234,224,.22)', font: `500 15px ${SANS}` })}>{t("I'll type instead")}</button>
               </div>
-              <div style={{ font: `400 12px/1.5 ${SANS}`, color: DIM }}>Your browser will ask to confirm. You can change this anytime in its site settings.</div>
+              <div style={{ font: `400 12px/1.5 ${SANS}`, color: DIM }}>{t('Your browser will ask to confirm. You can change this anytime in its site settings.')}</div>
             </div>
           )}
 
@@ -455,10 +463,10 @@ export default function AstrologerWidget() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 12px 10px 16px', borderBottom: '1px solid rgba(239,234,224,.08)' }}>
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <div style={{ font: `500 20px/1.1 ${SERIF}`, color: INK }}>{ch.name}</div>
-                  <div style={{ font: `400 10px ${MONO}`, letterSpacing: '.12em', textTransform: 'uppercase', color: DIM }}>{ch.role}</div>
+                  <div style={{ font: `400 10px ${MONO}`, letterSpacing: '.12em', textTransform: 'uppercase', color: DIM }}>{t(ch.role)}</div>
                 </div>
-                <button type="button" className="astro-hov astro-focus" onClick={minimize} aria-label="Minimize astrologer" title="Minimize" style={{ ...round(34), background: 'transparent' }}><Icon d={['M6 12h12']} /></button>
-                <button type="button" className="astro-hov astro-focus" onClick={collapse} aria-label="Close conversation" title="Close" style={{ ...round(34), background: 'transparent' }}><Icon d={['M7 7l10 10M17 7L7 17']} /></button>
+                <button type="button" className="astro-hov astro-focus" onClick={minimize} aria-label={t('Minimize astrologer')} title={t('Minimize')} style={{ ...round(34), background: 'transparent' }}><Icon d={['M6 12h12']} /></button>
+                <button type="button" className="astro-hov astro-focus" onClick={collapse} aria-label={t('Close conversation')} title={t('Close')} style={{ ...round(34), background: 'transparent' }}><Icon d={['M7 7l10 10M17 7L7 17']} /></button>
               </div>
 
                 <>
@@ -467,12 +475,12 @@ export default function AstrologerWidget() {
                     <div style={{ position: 'relative', width: compact ? 64 : 92, height: compact ? 74 : 106, flexShrink: 0 }}><Figure id={ch.id} state={aState === 'connecting' ? 'thinking' : aState} reduced={reduced} /></div>
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, font: `500 10px ${MONO}`, letterSpacing: '.12em', textTransform: 'uppercase', color: stateColor }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateColor, boxShadow: `0 0 8px ${stateColor}` }} />{stateLabel}{cardAnim}
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateColor, boxShadow: `0 0 8px ${stateColor}` }} />{t(stateLabel)}{cardAnim}
                       </div>
                       {showWords ? <Captions caption={caption} compact={compact} size={subPx} /> : stageText && <div style={{ font: `400 14px/1.5 ${SANS}`, color: aState === 'idle' ? SOFT : cardTextColor, textWrap: 'pretty' }}>{stageText}</div>}
                       {aState === 'error' && <div style={{ display: 'flex', gap: 8 }}>{PAID_FIX[err]
-                        ? <Link to={PAID_FIX[err][1]} onClick={astro.reset} className="astro-focus" style={pill({ padding: '6px 12px', font: `500 12px ${SANS}`, borderBottom: 'none' })}>{PAID_FIX[err][0]}</Link>
-                        : <button type="button" className="astro-focus" onClick={retry} style={pill({ padding: '6px 12px', font: `500 12px ${SANS}` })}>Try again</button>}</div>}
+                        ? <Link to={PAID_FIX[err][1]} onClick={astro.reset} className="astro-focus" style={pill({ padding: '6px 12px', font: `500 12px ${SANS}`, borderBottom: 'none' })}>{t(PAID_FIX[err][0])}</Link>
+                        : <button type="button" className="astro-focus" onClick={retry} style={pill({ padding: '6px 12px', font: `500 12px ${SANS}` })}>{t('Try again')}</button>}</div>}
                     </div>
                   </div>}
 
@@ -485,7 +493,7 @@ export default function AstrologerWidget() {
                           <div style={{ font: `400 15px/1.55 ${SANS}`, color: INK, textWrap: 'pretty' }}>{m.text}</div>
                           {m.ref && READINGS[m.ref] && (
                             <Link to={READINGS[m.ref][1]} style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 7, padding: '5px 11px', borderRadius: 999, border: '1px solid rgba(183,164,230,.4)', background: 'rgba(183,164,230,.08)', font: `400 12px ${SANS}`, color: '#C9BCF0' }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#B7A4E6' }} />{READINGS[m.ref][0]} →
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#B7A4E6' }} />{t(READINGS[m.ref][0])} →
                             </Link>
                           )}
                         </div>
@@ -493,7 +501,7 @@ export default function AstrologerWidget() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '4px 16px 10px', flexShrink: 0, scrollbarWidth: 'none' }}>
-                    {SUGG.map(label => <button key={label} type="button" className="astro-chip astro-focus" onClick={() => astro.ask(label)} style={{ flexShrink: 0, padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(212,178,106,.35)', background: 'rgba(212,178,106,.06)', color: '#EBD39A', font: `400 13px ${SANS}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>{label}</button>)}
+                    {(PAGE_SUGG[page] || SUGG).map(label => <button key={label} type="button" className="astro-chip astro-focus" onClick={() => astro.ask(t(label))} style={{ flexShrink: 0, padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(212,178,106,.35)', background: 'rgba(212,178,106,.06)', color: '#EBD39A', font: `400 13px ${SANS}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>{t(label)}</button>)}
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 12px 12px', borderTop: '1px solid rgba(239,234,224,.08)', background: '#0B0F20' }}>
@@ -503,8 +511,8 @@ export default function AstrologerWidget() {
                           <Icon d={k.d} />
                         </button>
                       ))}
-                      <input ref={inputRef} value={input} onChange={ev => setInput(ev.target.value)} placeholder={`Ask about your ${compact ? 'chart' : 'chart, houses or today'}…`} aria-label="Type a question about your readings" style={{ flex: 1, minWidth: 0, height: 48, padding: '0 16px', borderRadius: 999, border: '1px solid rgba(239,234,224,.16)', background: 'rgba(239,234,224,.05)', color: INK, font: `400 15px ${SANS}`, outline: 'none' }} />
-                      <button type="submit" className="astro-focus" aria-label="Send question" title="Send" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: '50%', border: '1px solid rgba(239,234,224,.2)', background: 'transparent', color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><Icon d={['M5 12h14M13 6l6 6-6 6']} size={18} /></button>
+                      <input ref={inputRef} value={input} onChange={ev => setInput(ev.target.value)} placeholder={compact ? t('Ask about your chart…') : t('Ask about your chart, houses or today…')} aria-label={t('Type a question about your readings')} style={{ flex: 1, minWidth: 0, height: 48, padding: '0 16px', borderRadius: 999, border: '1px solid rgba(239,234,224,.16)', background: 'rgba(239,234,224,.05)', color: INK, font: `400 15px ${SANS}`, outline: 'none' }} />
+                      <button type="submit" className="astro-focus" aria-label={t('Send question')} title={t('Send')} style={{ width: 44, height: 44, flexShrink: 0, borderRadius: '50%', border: '1px solid rgba(239,234,224,.2)', background: 'transparent', color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><Icon d={['M5 12h14M13 6l6 6-6 6']} size={18} /></button>
                     </form>
                     <div style={{ display: 'flex' }}>{liveSwitch(true)}</div>
                   </div>
@@ -516,8 +524,8 @@ export default function AstrologerWidget() {
 
       {toast && (
         <div role="status" style={{ position: 'fixed', left: '50%', bottom: 20, transform: 'translateX(-50%)', zIndex: 901, display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 24px)', padding: '12px 12px 12px 18px', borderRadius: 14, background: PANEL, border: '1px solid rgba(239,234,224,.16)', boxShadow: '0 18px 50px rgba(0,0,0,.5)', font: `400 14px/1.4 ${SANS}`, color: INK, animation: 'astro-in .3s ease both' }}>
-          <span>{ch.name} is hidden. Bring them back from <Link to="/choose-astrologer">Your astrologer</Link> in the menu.</span>
-          <button type="button" className="astro-focus" onClick={undoHide} style={pill({ padding: '7px 14px', border: 0, background: GOLD, color: '#07091A' })}>Undo</button>
+          <span>{hidPre}<Link to="/choose-astrologer">{t('Your astrologer')}</Link>{hidPost}</span>
+          <button type="button" className="astro-focus" onClick={undoHide} style={pill({ padding: '7px 14px', border: 0, background: GOLD, color: '#07091A' })}>{t('Undo')}</button>
         </div>
       )}
     </div>

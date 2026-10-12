@@ -3,7 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import Starfield from '../components/Starfield.jsx';
 import { buyMinutes, chooseProfilePack, changePlan, getCard, payOpenInvoice, saveCard, startCardSetup, subscribe } from '../lib/api.js';
-import { appearance, cadence, euros, fonts, forgetStatus, getCatalog, getStatus, getStripe, longDate, packName, settle } from '../lib/billing.js';
+import { appearance, euros, every, fonts, forgetStatus, getCatalog, getStatus, getStripe, longDate, packName, settle } from '../lib/billing.js';
+import { getLang, t } from '../i18n/index.js';
 
 /* Every payment in the app happens here, on our own page with Stripe
    Elements: a plan, a trial, a profile pack, a minute pack, an unpaid
@@ -30,27 +31,27 @@ function describe(q, catalog, status) {
   if ((item === 'plan' || item === 'change') && plan) {
     const trial = item === 'plan' && q.get('trial') === '1' && plan.tier === catalog.trial.tier;
     const lines = trial
-      ? [[`${catalog.trial.days}-day trial`, euros(catalog.trial.amount)], [`Then ${plan.name}, every ${cadence(plan.months)}`, euros(plan.amount)]]
-      : [[`${plan.name}, every ${cadence(plan.months)}`, euros(plan.amount)]];
+      ? [[t('{days}-day trial', { days: catalog.trial.days }), euros(catalog.trial.amount)], [t('Then {plan}, {every}', { plan: plan.name, every: every(plan.months) }), euros(plan.amount)]]
+      : [[t('{plan}, {every}', { plan: plan.name, every: every(plan.months) }), euros(plan.amount)]];
     return item === 'plan' ? {
-      title: trial ? `Try ${plan.name} for ${catalog.trial.days} days.` : `${plan.name}, every ${cadence(plan.months)}.`,
+      title: trial ? t('Try {plan} for {days} days.', { plan: plan.name, days: catalog.trial.days }) : t('{plan}, {every}.', { plan: plan.name, every: every(plan.months) }),
       lines, dueToday: trial ? catalog.trial.amount : plan.amount,
       notes: trial
-        ? [`${catalog.trial.minutes} astrologer minutes during the trial.`, `After ${catalog.trial.days} days ${plan.name} starts at ${euros(plan.amount)} a month on the same card, unless you cancel first.`]
-        : [`${plan.minutes} astrologer minutes every ${cadence(plan.months)}.`, `Renews automatically. Cancel any time from the billing page.`],
+        ? [t('{minutes} astrologer minutes during the trial.', { minutes: catalog.trial.minutes }), t('After {days} days {plan} starts at {price} a month on the same card, unless you cancel first.', { days: catalog.trial.days, plan: plan.name, price: euros(plan.amount) })]
+        : [t('{minutes} astrologer minutes {every}.', { minutes: plan.minutes, every: every(plan.months) }), t('Renews automatically. Cancel any time from the billing page.')],
       start: () => subscribe(plan.tier, trial),
       done: s => s.entitled,
       // the dashboard sends a new account on to its birth details
       next: '/dashboard',
-      cta: 'Continue to payment'
+      cta: t('Continue to payment')
     } : {
-      title: `Switch to ${plan.name}.`,
+      title: t('Switch to {plan}.', { plan: plan.name }),
       lines, dueToday: null,
-      notes: ['The switch happens now and a new billing period starts today.', 'Whatever is left of your current plan is credited against the new price.', 'Astrologer minutes already used this period still count.'],
+      notes: [t('The switch happens now and a new billing period starts today.'), t('Whatever is left of your current plan is credited against the new price.'), t('Astrologer minutes already used this period still count.')],
       start: () => changePlan(plan.tier),
       done: s => s.plan && s.plan.tier === plan.tier && s.entitled,
       next: '/billing',
-      cta: `Switch to ${plan.name}`
+      cta: t('Switch to {plan}', { plan: plan.name })
     };
   }
   if (item === 'profiles') {
@@ -69,24 +70,24 @@ function describe(q, catalog, status) {
       const share = current && end ? Math.min(1, Math.max(0, (new Date(end) - Date.now()) / (30.44 * 864e5))) : null;
       const prorated = share == null || same ? null : Math.round((pack.amount - current.amount) * share);
       return {
-        title: same ? `You already have ${packName(pack)}.` : current ? `${up ? 'Upgrade' : 'Downgrade'} to ${packName(pack)}.` : `${packName(pack)}, every month.`,
+        title: same ? t('You already have {pack}.', { pack: packName(pack) }) : current ? t(up ? 'Upgrade to {pack}.' : 'Downgrade to {pack}.', { pack: packName(pack) }) : t('{pack}, every month.', { pack: packName(pack) }),
         same,
         slots: status && { used, roomNow, roomNew, canAdd },
-        lines: same ? [] : [[current ? `${euros(current.amount)} → ${euros(pack.amount)} a month` : 'Every month', euros(pack.amount)]],
+        lines: same ? [] : [[current ? t('{from} → {to} a month', { from: euros(current.amount), to: euros(pack.amount) }) : t('Every month'), euros(pack.amount)]],
         dueToday: same ? null : current ? (prorated > 0 ? prorated : null) : pack.amount,
-        dueLabel: current && prorated > 0 ? 'About, today' : null,
+        dueLabel: current && prorated > 0 ? t('About, today') : null,
         // what every bill after today costs, so the prorated figure is not read as the new price
-        then: same ? null : [end && current ? `From ${longDate(end)}` : 'Then every month', `${euros(pack.amount)} / month`],
+        then: same ? null : [end && current ? t('From {date}', { date: longDate(end) }) : t('Then every month'), t('{price} / month', { price: euros(pack.amount) })],
         notes: same ? [] : [
           current && end
-            ? (prorated > 0 ? `Today's amount is a one-off for the days left until ${longDate(end)}. From then on you pay the full ${euros(pack.amount)} every month.` : `About ${euros(Math.abs(prorated || 0))} unused is credited to your ${longDate(end)} invoice. From then on you pay ${euros(pack.amount)} every month.`)
-            : current ? 'The difference is charged or credited today; your renewal date stays the same.' : 'Renews every month and ends with your plan.',
-          'Saved people cannot be deleted, only switched off.'
+            ? (prorated > 0 ? t("Today's amount is a one-off for the days left until {date}. From then on you pay the full {price} every month.", { date: longDate(end), price: euros(pack.amount) }) : t('About {credit} unused is credited to your {date} invoice. From then on you pay {price} every month.', { credit: euros(Math.abs(prorated || 0)), date: longDate(end), price: euros(pack.amount) }))
+            : current ? t('The difference is charged or credited today; your renewal date stays the same.') : t('Renews every month and ends with your plan.'),
+          t('Saved people cannot be deleted, only switched off.')
         ],
         start: () => chooseProfilePack(pack.id),
         done: s => s.profiles.pack === pack.id,
         next: '/billing',
-        cta: current ? `${up ? 'Upgrade' : 'Downgrade'} to ${pack.extra} extra` : 'Continue to payment'
+        cta: current ? t(up ? 'Upgrade to {n} extra' : 'Downgrade to {n} extra', { n: pack.extra }) : t('Continue to payment')
       };
     }
   }
@@ -94,28 +95,28 @@ function describe(q, catalog, status) {
     const pack = catalog.minutePacks.find(p => p.id === q.get('pack'));
     const qty = Math.min(catalog.maxPackQuantity, Math.max(1, parseInt(q.get('qty'), 10) || 1));
     if (pack) return {
-      title: `${pack.minutes * qty} more minutes with your astrologer.`,
-      lines: [[`${qty} × ${pack.minutes}-minute pack`, euros(pack.amount * qty)]], dueToday: pack.amount * qty,
-      notes: ['Paid once. Top-up minutes never expire and are used after your plan minutes.'],
+      title: t('{n} more minutes with your astrologer.', { n: pack.minutes * qty }),
+      lines: [[t('{qty} × {n}-minute pack', { qty, n: pack.minutes }), euros(pack.amount * qty)]], dueToday: pack.amount * qty,
+      notes: [t('Paid once. Top-up minutes never expire and are used after your plan minutes.')],
       start: () => buyMinutes(pack.id, qty),
       done: () => true,
       next: '/billing',
-      cta: 'Continue to payment'
+      cta: t('Continue to payment')
     };
   }
   if (item === 'invoice') {
     const kind = q.get('kind') === 'profiles' ? 'profiles' : 'plan';
     return {
-      title: 'Settle your last invoice.',
+      title: t('Settle your last invoice.'),
       lines: [], dueToday: null,
-      notes: ['Your last payment did not go through. Pay it here and everything unlocks again.'],
+      notes: [t('Your last payment did not go through. Pay it here and everything unlocks again.')],
       start: () => payOpenInvoice(kind),
       done: s => (kind === 'plan' ? s.entitled : s.profiles.status === 'active'),
       next: '/billing',
-      cta: 'Continue to payment'
+      cta: t('Continue to payment')
     };
   }
-  if (item === 'card') return { card: true, title: 'A new card for renewals.', lines: [], notes: ['Every renewal and top-up is charged to this card from now on. Nothing is charged today.'], next: '/billing' };
+  if (item === 'card') return { card: true, title: t('A new card for renewals.'), lines: [], notes: [t('Every renewal and top-up is charged to this card from now on. Nothing is charged today.')], next: '/billing' };
   return null;
 }
 
@@ -149,7 +150,7 @@ export default function Checkout() {
     try {
       const s = await settle(order.done, paymentIntentId);
       setAfter(s);
-      if (!order.done(s)) setError('Your payment went through and is still being confirmed. This page will be up to date in a minute.');
+      if (!order.done(s)) setError(t('Your payment went through and is still being confirmed. This page will be up to date in a minute.'));
       setStep('done');
     } catch (e) { setError(e.message); setStep('done'); }
   };
@@ -162,7 +163,7 @@ export default function Checkout() {
       started.current = true;
       getStripe().then(stripe => stripe.retrievePaymentIntent(returned)).then(({ paymentIntent }) => {
         if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) finish(paymentIntent.id);
-        else { setError('The payment was not completed. Try again or use another card.'); setStep('review'); started.current = false; }
+        else { setError(t('The payment was not completed. Try again or use another card.')); setStep('review'); started.current = false; }
       });
     } else if (setupReturned && q.get('redirect_status') === 'succeeded') {
       started.current = true;
@@ -189,26 +190,26 @@ export default function Checkout() {
     } finally { setBusy(false); }
   };
 
-  if (!order && catalog) return <Shell><p style={{ color: MUTED }}>There is nothing to pay for here. <Link to="/subscription">See plans</Link></p></Shell>;
+  if (!order && catalog) return <Shell><p style={{ color: MUTED }}>{t('There is nothing to pay for here.')} <Link to="/subscription">{t('See plans')}</Link></p></Shell>;
 
   return (
     <Shell>
-      {!order ? <span style={eyebrow}>{error || 'Loading…'}</span> : (
+      {!order ? <span style={eyebrow}>{error || t('Loading…')}</span> : (
         <div className="co-grid" style={{ display: 'grid', gap: 36, alignItems: 'start' }}>
           <section style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) both' }}>
-            <span style={eyebrow}>{step === 'done' ? 'Confirmed' : 'Checkout'}</span>
+            <span style={eyebrow}>{step === 'done' ? t('Confirmed') : t('Checkout')}</span>
             <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,6vw,42px)', lineHeight: 1.08, textWrap: 'balance' }}>{order.title}</h1>
             {order.slots && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${INK}`, paddingTop: 14 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                  {[['In use', order.slots.used], ['Room now', order.slots.roomNow], [order.same ? 'Your pack' : 'With this pack', order.slots.roomNew]].map(([label, n]) => (
+                  {[[t('In use'), order.slots.used], [t('Room now'), order.slots.roomNow], [order.same ? t('Your pack') : t('With this pack'), order.slots.roomNew]].map(([label, n]) => (
                     <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <span style={{ fontFamily: SERIF, fontSize: 30, lineHeight: 1 }}>{n}</span>
                       <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED }}>{label}</span>
                     </div>
                   ))}
                 </div>
-                <span style={{ fontSize: 15, color: GOLD }}>{order.slots.canAdd ? `You can add ${order.slots.canAdd} more ${order.slots.canAdd === 1 ? 'person' : 'people'}.` : 'Every slot would be in use.'}</span>
+                <span style={{ fontSize: 15, color: GOLD }}>{order.slots.canAdd ? t(order.slots.canAdd === 1 ? 'You can add {n} more person.' : 'You can add {n} more people.', { n: order.slots.canAdd }) : t('Every slot would be in use.')}</span>
               </div>
             )}
             {order.lines.length > 0 && (
@@ -220,7 +221,7 @@ export default function Checkout() {
                 ))}
                 {(intent && intent.amount != null ? intent.amount : order.dueToday) != null && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '12px 0', fontFamily: MONO, fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase' }}>
-                    <span>{intent && intent.amount != null ? 'Due today' : order.dueLabel || 'Due today'}</span><span style={{ color: GOLD, fontSize: 15 }}>{euros(intent && intent.amount != null ? intent.amount : order.dueToday)}</span>
+                    <span>{intent && intent.amount != null ? t('Due today') : order.dueLabel || t('Due today')}</span><span style={{ color: GOLD, fontSize: 15 }}>{euros(intent && intent.amount != null ? intent.amount : order.dueToday)}</span>
                   </div>
                 )}
                 {order.then && (
@@ -240,13 +241,13 @@ export default function Checkout() {
 
             {step === 'review' && !order.card && (
               <>
-                {q.get('item') === 'profiles' && !status ? <span style={eyebrow}>Loading…</span> : order.same ? <>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>Nothing to pay. Pick a different pack to upgrade or downgrade.</p>
-                <Link to="/billing" className="hov-cream" style={{ ...cta(true), borderBottom: 'none' }}><span>See profile packs</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span></Link>
+                {q.get('item') === 'profiles' && !status ? <span style={eyebrow}>{t('Loading…')}</span> : order.same ? <>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>{t('Nothing to pay. Pick a different pack to upgrade or downgrade.')}</p>
+                <Link to="/billing" className="hov-cream" style={{ ...cta(true), borderBottom: 'none' }}><span>{t('See profile packs')}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span></Link>
                 </> : <>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>{card ? `Your ${brand(card.brand)} ending ${card.last4} is on file.` : 'Card details come next, on this page. They go straight to Stripe and never touch our servers.'}</p>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>{card ? t('Your {brand} ending {last4} is on file.', { brand: brand(card.brand), last4: card.last4 }) : t('Card details come next, on this page. They go straight to Stripe and never touch our servers.')}</p>
                 <button type="button" onClick={begin} disabled={busy} className="hov-cream" style={cta(!busy)}>
-                  <span>{busy ? 'One moment…' : order.cta}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
+                  <span>{busy ? t('One moment…') : order.cta}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
                 </button>
                 </>}
               </>
@@ -259,21 +260,21 @@ export default function Checkout() {
                 onError={setError} />
             )}
 
-            {step === 'finishing' && <span style={eyebrow}>Confirming with Stripe…</span>}
+            {step === 'finishing' && <span style={eyebrow}>{t('Confirming with Stripe…')}</span>}
 
             {step === 'done' && (
               <>
-                <p style={{ margin: 0, fontFamily: SERIF, fontSize: 22, lineHeight: 1.3 }}>{order.card ? (card ? `${brand(card.brand)} ending ${card.last4} is now your card.` : 'Card saved.') : 'Thank you. It is all set.'}</p>
+                <p style={{ margin: 0, fontFamily: SERIF, fontSize: 22, lineHeight: 1.3 }}>{order.card ? (card ? t('{brand} ending {last4} is now your card.', { brand: brand(card.brand), last4: card.last4 }) : t('Card saved.')) : t('Thank you. It is all set.')}</p>
                 {q.get('item') === 'profiles' && after && (
-                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>You have room for {after.profiles.included + after.profiles.extra} profiles and hold {after.profiles.used}.</p>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>{t('You have room for {room} profiles and hold {used}.', { room: after.profiles.included + after.profiles.extra, used: after.profiles.used })}</p>
                 )}
                 <button type="button" onClick={() => navigate(next)} className="hov-cream" style={cta(true)}>
-                  <span>Continue</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
+                  <span>{t('Continue')}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
                 </button>
               </>
             )}
 
-            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.4)' }}>Payments by Stripe · prices in euro, VAT included</span>
+            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.4)' }}>{t('Payments by Stripe · prices in euro, VAT included')}</span>
           </section>
         </div>
       )}
@@ -281,15 +282,15 @@ export default function Checkout() {
   );
 }
 
-const brand = b => (b ? b.charAt(0).toUpperCase() + b.slice(1) : 'Card');
+const brand = b => (b ? b.charAt(0).toUpperCase() + b.slice(1) : t('Card'));
 
 /** The Payment Element for one client secret; a saved card can pay without it. */
 function StripeForm(props) {
   const [stripe, setStripe] = useState(null);
   useEffect(() => { getStripe().then(setStripe); }, []);
-  if (!stripe) return <span style={eyebrow}>Loading the secure form…</span>;
+  if (!stripe) return <span style={eyebrow}>{t('Loading the secure form…')}</span>;
   return (
-    <Elements stripe={stripe} options={{ clientSecret: props.clientSecret, appearance, fonts }}>
+    <Elements stripe={stripe} options={{ clientSecret: props.clientSecret, appearance, fonts, locale: getLang() }}>
       <PayForm {...props} />
     </Elements>
   );
@@ -320,9 +321,9 @@ function PayForm({ clientSecret, setup, savedCard, amount, onPaid, onSaved, onEr
         : await stripe.confirmPayment({ elements, confirmParams: { return_url: returnUrl }, redirect: 'if_required' });
       if (error) throw error;
       if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing') onPaid(paymentIntent.id);
-      else throw new Error('The payment was not completed. Try again or use another card.');
+      else throw new Error(t('The payment was not completed. Try again or use another card.'));
     } catch (e) {
-      onError(e.message || 'The payment did not go through.');
+      onError(e.message || t('The payment did not go through.'));
     } finally { setBusy(false); }
   };
 
@@ -331,7 +332,7 @@ function PayForm({ clientSecret, setup, savedCard, amount, onPaid, onSaved, onEr
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {savedCard && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid rgba(244,236,220,.18)' }}>
-          {[[true, `${brand(savedCard.brand)} •••• ${savedCard.last4}`, `Expires ${String(savedCard.expMonth).padStart(2, '0')}/${String(savedCard.expYear).slice(-2)}`], [false, 'Another card', '']].map(([v, label, note]) => (
+          {[[true, `${brand(savedCard.brand)} •••• ${savedCard.last4}`, t('Expires {date}', { date: `${String(savedCard.expMonth).padStart(2, '0')}/${String(savedCard.expYear).slice(-2)}` })], [false, t('Another card'), '']].map(([v, label, note]) => (
             <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid rgba(244,236,220,.18)', cursor: 'pointer', fontSize: 14.5 }}>
               <input type="radio" name="method" checked={useSaved === v} onChange={() => setUseSaved(v)} style={{ accentColor: GOLD }} />
               <span style={{ flex: 1 }}>{label}</span>
@@ -345,7 +346,7 @@ function PayForm({ clientSecret, setup, savedCard, amount, onPaid, onSaved, onEr
         <PaymentElement onReady={() => setReady(true)} options={{ layout: 'tabs', wallets: { applePay: 'never', googlePay: 'never', link: 'never' } }} />
       </div>
       <button type="button" onClick={pay} disabled={!can} className="hov-cream" style={cta(can)}>
-        <span>{busy ? 'Processing…' : setup ? 'Save card' : `Pay ${euros(amount)}`}</span>
+        <span>{busy ? t('Processing…') : setup ? t('Save card') : t('Pay {price}', { price: euros(amount) })}</span>
         <span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
       </button>
     </div>
@@ -360,7 +361,7 @@ function Shell({ children }) {
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.6)' }} />
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1100, width: '100%', margin: '0 auto' }}>
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
-        <span style={{ ...quiet, cursor: 'default', display: 'flex', alignItems: 'center', gap: 6 }}><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true"><rect x="1" y="5" width="8" height="6.5" rx="1" fill="none" stroke="currentColor" /><path d="M3 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" /></svg>Secure</span>
+        <span style={{ ...quiet, cursor: 'default', display: 'flex', alignItems: 'center', gap: 6 }}><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true"><rect x="1" y="5" width="8" height="6.5" rx="1" fill="none" stroke="currentColor" /><path d="M3 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" /></svg>{t('Secure')}</span>
       </header>
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1100, margin: '0 auto', padding: '36px 24px 56px' }}>{children}</main>
     </div>

@@ -1,6 +1,9 @@
 /* Maps the API's natal chart payload onto the shape the wheel and the reading
    already render. All astronomy happens on the server; this file is presentation
-   only — glyphs, roman numerals, and the strings the design asks for. */
+   only — glyphs, roman numerals, and the strings the design asks for.
+   Sign and body names stay English here (they are also lookup keys); pages
+   pass them through t() where they are shown. */
+import { locale } from '../i18n/index.js';
 
 export const SIGNS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
@@ -13,7 +16,6 @@ const BODY_NAME = { sun: 'Sun', moon: 'Moon', mercury: 'Mercury', venus: 'Venus'
 export const BODY_GLYPH = { sun: '☉', moon: '☽', mercury: '☿', venus: '♀', mars: '♂', jupiter: '♃', saturn: '♄', uranus: '♅', neptune: '♆', pluto: '♇', northNode: '☊' };
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /* Trine and sextile are drawn gold; the rest are drawn sage. */
 const SOFT = new Set(['trine', 'sextile']);
@@ -26,10 +28,9 @@ function point(p) {
   return { lon: p.lon, sign, signGlyph: SIGN_GLYPH[sign], deg: degText(p), text: degText(p), full: `${degText(p)} ${sign}` };
 }
 
-/** "15 Aug 1995" from "1995-08-15". */
+/** "15 Aug 1995" from "1995-08-15", in the reader's language. */
 export function dobText(iso) {
-  const [y, m, d] = String(iso).split('-');
-  return `${d} ${MONTHS[+m - 1]} ${y}`;
+  return new Date(`${String(iso).slice(0, 10)}T00:00:00Z`).toLocaleDateString(locale(), { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 /** payload is the whole { profile, chart, reading } response. */

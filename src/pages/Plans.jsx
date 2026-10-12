@@ -4,7 +4,8 @@ import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
 import { logout } from '../lib/api.js';
 import { clearActive } from '../lib/active-profile.js';
-import { cadence, euros, getCatalog, getStatus, minutesText } from '../lib/billing.js';
+import { cadence, euros, every, getCatalog, getStatus, minutesText } from '../lib/billing.js';
+import { t } from '../i18n/index.js';
 
 /* Pricing. Every plan opens the whole app; they differ only in how long a
    billing period runs and how many astrologer minutes come with it. */
@@ -40,29 +41,29 @@ export default function Plans() {
   /* Who is looking decides the opening words: a member changing plan, someone
      whose plan ended, a new account that has not picked one yet, or a visitor. */
   const intro = status && status.entitled ? {
-    eyebrow: 'Your plan',
-    title: 'Change your plan.',
-    text: 'A switch takes effect today, and whatever is left of your current plan is credited towards the new one. Every plan includes the full app; longer plans cost less per month and come with more time with your astrologer.'
+    eyebrow: t('Your plan'),
+    title: t('Change your plan.'),
+    text: t('A switch takes effect today, and whatever is left of your current plan is credited towards the new one. Every plan includes the full app; longer plans cost less per month and come with more time with your astrologer.')
   } : lapsed ? {
-    eyebrow: 'Welcome back',
-    title: 'Pick up where you left off.',
-    text: 'Your charts and saved people are still here. Choose a plan to open them again.'
+    eyebrow: t('Welcome back'),
+    title: t('Pick up where you left off.'),
+    text: t('Your charts and saved people are still here. Choose a plan to open them again.')
   } : status ? {
     // no eyebrow: birth details still come after this, so it is not a "last step"
-    title: 'Choose a plan to begin.',
-    text: 'A plan opens your natal chart, daily horoscope and transits, synastry, tarot, numerology and your own AI astrologer. Every plan includes all of it; longer plans simply cost less per month. Cancel any time.'
+    title: t('Choose a plan to begin.'),
+    text: t('A plan opens your natal chart, daily horoscope and transits, synastry, tarot, numerology and your own AI astrologer. Every plan includes all of it; longer plans simply cost less per month. Cancel any time.')
   } : {
-    eyebrow: 'Choose a plan',
-    title: 'Everything in the sky, one plan away.',
-    text: 'Every plan includes the full app. Longer plans cost less per month and come with more time with your astrologer.'
+    eyebrow: t('Choose a plan'),
+    title: t('Everything in the sky, one plan away.'),
+    text: t('Every plan includes the full app. Longer plans cost less per month and come with more time with your astrologer.')
   };
   const trialOn = trial && (status === null || (status && status.trialAvailable && !status.entitled));
 
   const choose = tier => {
-    const t = tier === catalog.trial.tier && trialOn ? '&trial=1' : '';
-    if (status === null) return navigate(`/signup?plan=${tier}${t}`);
+    const tr = tier === catalog.trial.tier && trialOn ? '&trial=1' : '';
+    if (status === null) return navigate(`/signup?plan=${tier}${tr}`);
     if (status.entitled) return navigate(`/checkout?item=change&plan=${tier}`);
-    navigate(`/checkout?item=plan&plan=${tier}${t}`);
+    navigate(`/checkout?item=plan&plan=${tier}${tr}`);
   };
 
   return (
@@ -74,8 +75,8 @@ export default function Plans() {
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         {status && status.entitled ? <NavMenu current="Plan & billing" />
-          : status ? <button type="button" onClick={signOut} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>Log out</button>
-          : <Link to="/login" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase' }}>Sign in</Link>}
+          : status ? <button type="button" onClick={signOut} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>{t('Log out')}</button>
+          : <Link to="/login" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase' }}>{t('Sign in')}</Link>}
       </header>
 
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '40px 24px 64px', display: 'flex', flexDirection: 'column', gap: 34 }}>
@@ -88,8 +89,8 @@ export default function Plans() {
         {error && <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14 }}>{error}</div>}
         {lapsed && (
           <div role="alert" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '12px 16px', fontSize: 14.5 }}>
-            <span>{current.status === 'past_due' || current.status === 'unpaid' ? 'Your last renewal did not go through, so the app is paused.' : 'Your plan has ended. Pick one to pick up where you left off.'}</span>
-            {(current.status === 'past_due' || current.status === 'unpaid') && <Link to="/checkout?item=invoice&kind=plan" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: GOLD, borderBottom: 'none' }}>Pay now →</Link>}
+            <span>{current.status === 'past_due' || current.status === 'unpaid' ? t('Your last renewal did not go through, so the app is paused.') : t('Your plan has ended. Pick one to pick up where you left off.')}</span>
+            {(current.status === 'past_due' || current.status === 'unpaid') && <Link to="/checkout?item=invoice&kind=plan" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: GOLD, borderBottom: 'none' }}>{t('Pay now →')}</Link>}
           </div>
         )}
 
@@ -102,34 +103,34 @@ export default function Plans() {
               const featured = p.tier === 'premium';
               return (
                 <article key={p.tier} className="pl-card" style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16, padding: '24px 22px 22px', border: `1px solid ${mine || featured ? GOLD : 'rgba(244,236,220,.25)'}`, background: 'rgba(28,37,56,.72)', transition: 'border-color .2s ease', animation: `om-rise .5s cubic-bezier(.3,0,.2,1) ${0.08 + i * 0.06}s both` }}>
-                  {(mine || featured) && <span style={{ position: 'absolute', top: -9, left: 20, background: NAVY, padding: '0 8px', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>{mine ? 'Current plan' : 'Most chosen'}</span>}
+                  {(mine || featured) && <span style={{ position: 'absolute', top: -9, left: 20, background: NAVY, padding: '0 8px', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>{mine ? t('Current plan') : t('Most chosen')}</span>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 30 }}>{p.name}</h2>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                       <span style={{ fontFamily: SERIF, fontSize: 44, lineHeight: 1 }}>{euros(p.amount)}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.06em', color: MUTED }}>every {cadence(p.months)}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.06em', color: MUTED }}>{every(p.months)}</span>
                     </div>
-                    <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.06em', color: p.months > 1 ? SAGE : 'transparent' }}>{p.months > 1 ? `${euros(Math.round(p.amount / p.months))} a month` : '·'}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.06em', color: p.months > 1 ? SAGE : 'transparent' }}>{p.months > 1 ? t('{price} a month', { price: euros(Math.round(p.amount / p.months)) }) : '·'}</span>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '12px 0', borderTop: '1px solid rgba(244,236,220,.18)', borderBottom: '1px solid rgba(244,236,220,.18)' }}>
-                    <span style={{ fontSize: 14.5 }}>Astrologer minutes</span>
+                    <span style={{ fontSize: 14.5 }}>{t('Astrologer minutes')}</span>
                     <span style={{ fontFamily: MONO, fontSize: 13, color: GOLD }}>{p.minutes} / {cadence(p.months)}</span>
                   </div>
 
                   <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
-                    {INCLUDED.map(t => <li key={t} style={{ display: 'flex', gap: 9, fontSize: 14, lineHeight: 1.45 }}><span style={{ fontFamily: MONO, color: SAGE }}>✓</span><span>{t}</span></li>)}
+                    {INCLUDED.map(x => <li key={x} style={{ display: 'flex', gap: 9, fontSize: 14, lineHeight: 1.45 }}><span style={{ fontFamily: MONO, color: SAGE }}>✓</span><span>{t(x)}</span></li>)}
                   </ul>
 
                   {canTrial && (
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', border: `1px solid ${trial ? 'rgba(180,147,63,.6)' : 'rgba(244,236,220,.2)'}`, cursor: 'pointer', fontSize: 13.5, lineHeight: 1.45 }}>
                       <input type="checkbox" checked={trial} onChange={e => setTrial(e.target.checked)} style={{ accentColor: GOLD, marginTop: 3 }} />
-                      <span>Start with a {catalog.trial.days}-day trial for {euros(catalog.trial.amount)} and {catalog.trial.minutes} minutes. {p.name} begins after, unless you cancel.</span>
+                      <span>{t('Start with a {days}-day trial for {price} and {minutes} minutes. {plan} begins after, unless you cancel.', { days: catalog.trial.days, price: euros(catalog.trial.amount), minutes: catalog.trial.minutes, plan: p.name })}</span>
                     </label>
                   )}
 
                   <button type="button" disabled={!!mine} onClick={() => choose(p.tier)} className={mine ? '' : 'hov-cream'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 50, padding: '0 16px 0 18px', background: mine ? 'transparent' : INK, color: mine ? MUTED : NAVY, border: mine ? '1px solid rgba(244,236,220,.25)' : 'none', borderRadius: 2, cursor: mine ? 'default' : 'pointer', fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 15 }}>
-                    <span>{mine ? 'Your plan' : status && status.entitled ? `Switch to ${p.name}` : canTrial && trial ? `Try for ${euros(catalog.trial.amount)}` : `Choose ${p.name}`}</span>
+                    <span>{mine ? t('Your plan') : status && status.entitled ? t('Switch to {plan}', { plan: p.name }) : canTrial && trial ? t('Try for {price}', { price: euros(catalog.trial.amount) }) : t('Choose {plan}', { plan: p.name })}</span>
                     {!mine && <span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>}
                   </button>
                 </article>
@@ -142,20 +143,20 @@ export default function Plans() {
         {catalog && status && status.entitled && (
           <section style={{ display: 'grid', gap: 18, gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', animation: 'om-rise .5s cubic-bezier(.3,0,.2,1) .3s both' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 14, borderTop: `1px solid ${INK}` }}>
-              <span style={eyebrow}>More people</span>
-              <span style={{ fontFamily: SERIF, fontSize: 22 }}>{catalog.profilePacks.map(p => `${p.extra} extra ${euros(p.amount)}`).join(' · ')}</span>
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED }}>Your own profile is included. For a partner, a parent or friends, pick a monthly pack of {catalog.profilePacks.map(p => p.extra).join(', ')} extra profiles, and switch whenever you need more room.{status && status.entitled ? <> <Link to="/billing">Choose a pack</Link>.</> : ''}</p>
+              <span style={eyebrow}>{t('More people')}</span>
+              <span style={{ fontFamily: SERIF, fontSize: 22 }}>{catalog.profilePacks.map(p => t('{n} extra {price}', { n: p.extra, price: euros(p.amount) })).join(' · ')}</span>
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED }}>{t('Your own profile is included. For a partner, a parent or friends, pick a monthly pack of {list} extra profiles, and switch whenever you need more room.', { list: catalog.profilePacks.map(p => p.extra).join(', ') })}{status && status.entitled ? <> <Link to="/billing">{t('Choose a pack')}</Link>.</> : ''}</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 14, borderTop: `1px solid ${INK}` }}>
-              <span style={eyebrow}>More minutes</span>
+              <span style={eyebrow}>{t('More minutes')}</span>
               <span style={{ fontFamily: SERIF, fontSize: 22 }}>{catalog.minutePacks.map(p => `${p.minutes} min ${euros(p.amount)}`).join(' · ')}</span>
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED }}>Top up whenever you like, as often as you like. Bought minutes never expire.{status && status.entitled ? <> <Link to="/billing">Top up now</Link>.</> : ''}</p>
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED }}>{t('Top up whenever you like, as often as you like. Bought minutes never expire.')}{status && status.entitled ? <> <Link to="/billing">{t('Top up now')}</Link>.</> : ''}</p>
             </div>
           </section>
         )}
 
         {status && status.entitled && (
-          <p style={{ margin: 0, textAlign: 'center', fontSize: 13.5, color: MUTED }}>{current.trial ? 'Trial' : current.name} · {minutesText(status.minutes.total)} left · <Link to="/billing">Manage billing</Link></p>
+          <p style={{ margin: 0, textAlign: 'center', fontSize: 13.5, color: MUTED }}>{current.trial ? t('Trial') : current.name} · {t('{minutes} left', { minutes: minutesText(status.minutes.total) })} · <Link to="/billing">{t('Manage billing')}</Link></p>
         )}
       </main>
     </div>

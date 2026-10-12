@@ -123,10 +123,79 @@ input:focus { outline: none; }
   .ca-bar { left: 50% !important; right: auto !important; transform: translateX(-50%); bottom: 24px !important; width: min(640px,calc(100% - 96px)) !important; }
 }
 
+/* Astrocartography: one column on phones; globe beside the reading from tablet up */
+.ac-shell { container-type: inline-size; width: 100%; }
+.ac-cols { grid-template-columns: minmax(0,1fr); grid-template-areas: "hero" "globe" "side" "angles" "foot"; }
+.ac-chip:hover, .ac-dest:hover { border-color: rgba(180,147,63,.9) !important; }
+@container (min-width: 820px) {
+  .ac-cols { padding: 48px 48px 80px !important; grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); column-gap: 64px !important; row-gap: 56px !important; grid-template-areas: "hero hero" "globe side" "angles angles" "foot foot"; align-items: start; }
+  .ac-hero h1 { font-size: 64px !important; }
+  .ac-hero { flex-direction: row !important; align-items: flex-end !important; justify-content: space-between !important; gap: 48px !important; }
+  /* the globe stays in view while the reading, best places and destinations scroll beside it */
+  .ac-globe { position: sticky; top: 24px; }
+  .ac-angles { grid-template-columns: repeat(4,minmax(0,1fr)) !important; }
+}
+@container (min-width: 1240px) { .ac-hero h1 { font-size: 76px !important; } }
+
 /* Page headers on phones: wordmark and menu must share one row.
    Page labels (.hdr-tag) give way first, and the menu never shrinks or wraps. */
 @media (max-width: 600px) {
   header { gap: 10px !important; padding-left: 16px !important; padding-right: 16px !important; }
   .hdr-tag { display: none !important; }
   .hdr-logo { font-size: 15px !important; letter-spacing: .1em !important; white-space: nowrap; }
+}
+
+/* Profile portrait dial (NavMenu): turns slowly all the time, one revolution a
+   minute, and brightens on hover or focus. Still for reduced-motion users. */
+@keyframes nm-dial-turn { to { transform: rotate(360deg); } }
+.nm-dial { opacity: .9; filter: drop-shadow(0 0 2px rgba(216,188,106,.55)); animation: nm-dial-turn 60s linear infinite; transition: opacity .3s ease, filter .3s ease; }
+.nm-dial-wrap:hover .nm-dial, .nm-dial-wrap:focus-within .nm-dial { opacity: 1; filter: drop-shadow(0 0 4px rgba(216,188,106,.85)); }
+@media (prefers-reduced-motion: reduce) { .nm-dial { animation: none; } }
+
+/* Palm reading: one column on phones; sticky camera beside the report from tablet up */
+@keyframes om-breathe { 0%, 100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.03); opacity: .95; } }
+.pr-shell { container-type: inline-size; width: 100%; }
+.pr-cols { grid-template-columns: minmax(0,1fr); grid-template-areas: "hero" "cam" "report" "foot"; }
+.pr-link:hover:not(:disabled), .pr-hand[aria-pressed="false"]:hover:not(:disabled) { color: #F4ECDC !important; }
+.pr-outline:hover:not(:disabled), .pr-shutter:hover, .pr-pick[aria-checked="false"]:hover { border-color: #F4ECDC !important; }
+.pr-shutter:active > span { transform: scale(.9); }
+.pr-link:disabled, .pr-hand:disabled { opacity: .45; cursor: default !important; }
+@container (min-width: 820px) {
+  .pr-cols { max-width: 1120px !important; padding: 54px 48px 80px !important; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); column-gap: 64px !important; row-gap: 56px !important; grid-template-areas: "hero hero" "cam report" "foot foot"; }
+  .pr-hero h1 { font-size: 64px !important; }
+  .pr-hero { flex-direction: row !important; align-items: flex-end !important; justify-content: space-between !important; gap: 48px !important; }
+  .pr-cam { position: sticky; top: 44px; align-self: start; }
+}
+@container (min-width: 1240px) { .pr-hero h1 { font-size: 76px !important; } }
+@media (prefers-reduced-motion: reduce) {
+  .pr-breathe { animation: none !important; opacity: .7; }
+}
+
+/* NavMenu rows (top links and submenu headers) */
+.nm-row:hover { background: rgba(244,236,220,.07) !important; }
+.nm-row:focus-visible { outline: 1px solid #D8BC6A; outline-offset: -1px; }
+
+/* Palm reading: the celestial scan (components/CelestialScan.jsx) */
+@keyframes cs-spin { to { transform: rotate(360deg); } }
+@keyframes cs-settle { from { opacity: 0; transform: scale(1.18) rotate(-20deg); } to { opacity: 1; transform: none; } }
+@keyframes cs-draw { to { stroke-dashoffset: 0; } }
+@keyframes cs-twinkle { from { opacity: .25; transform: scale(.7); } to { opacity: 1; transform: scale(1.25); } }
+@keyframes cs-rise { 0% { transform: translate(0, 0); opacity: 0; } 12% { opacity: .9; } 100% { transform: translate(var(--drift), -540px); opacity: 0; } }
+@keyframes cs-pulse { from { opacity: .45; } to { opacity: 1; } }
+@keyframes cs-ring { 0% { transform: scale(.2); opacity: 1; } 100% { transform: scale(16); opacity: 0; } }
+@keyframes cs-open { from { clip-path: circle(0% at 50% 54%); filter: brightness(1.6) saturate(1.2); } to { clip-path: circle(85% at 50% 54%); filter: none; } }
+.cs-spin { animation: cs-spin 60s linear infinite; }
+.cs-spin-rev { animation: cs-spin 40s linear infinite reverse; }
+.cs-orbit { animation: cs-spin 3.2s cubic-bezier(.45,.05,.55,.95) infinite; }
+.cs-settle { transform-origin: 200px 270px; animation: cs-settle 1.4s cubic-bezier(.3,0,.2,1) both; }
+.cs-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: cs-draw 1.6s cubic-bezier(.45,0,.2,1) forwards; }
+.cs-twinkle { animation: cs-twinkle 1.8s ease-in-out infinite alternate; }
+.cs-dust { animation-name: cs-rise; animation-timing-function: linear; animation-iteration-count: infinite; }
+.cs-pulse { animation: cs-pulse 3s ease-in-out infinite alternate; }
+.cs-ring { animation: cs-ring 1.4s cubic-bezier(.2,.6,.3,1) forwards; }
+.cs-reveal { animation: cs-open 1.4s cubic-bezier(.3,0,.2,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .cs-spin, .cs-spin-rev, .cs-orbit, .cs-settle, .cs-twinkle, .cs-pulse, .cs-reveal { animation: none !important; }
+  .cs-draw { animation: none !important; stroke-dashoffset: 0; }
+  .cs-dust, .cs-ring { display: none; }
 }

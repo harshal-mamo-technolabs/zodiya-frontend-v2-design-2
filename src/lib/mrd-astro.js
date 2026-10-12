@@ -4,6 +4,7 @@
    breathes at the chest and the head nods, tilts and bobs above the neck. Without its portrait
    (public/astrologers/<id>.png) it draws the sign's glyph in the same light instead. */
 import { CHARACTERS, byId } from './astrologers.js';
+import { t } from '../i18n/index.js';
 
 const IDS = CHARACTERS.map(c => c.id);
 const COL = { idle: [226, 184, 101], listening: [127, 224, 210], thinking: [185, 166, 255], speaking: [255, 217, 138], error: [255, 142, 142] };
@@ -81,7 +82,7 @@ class Astro extends HTMLElement {
   attributeChangedCallback(n, o, v) { if (o !== v && n === 'char' && this._cv) this._load(); }
   _load() {
     let id = this.getAttribute('char') || 'virgo'; if (!IDS.includes(id)) id = 'virgo';
-    this._id = id; this.setAttribute('aria-label', byId(id).name + ', your AI astrologer');
+    this._id = id; this.setAttribute('aria-label', t('{name}, your AI astrologer', { name: byId(id).name }));
     this._a = null; this._ready = true;
     loadImg(id).then(a => { if (this._id === id) this._a = a; }).catch(() => {});
   }

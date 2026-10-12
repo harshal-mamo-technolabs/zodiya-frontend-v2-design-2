@@ -4,6 +4,7 @@ import { createProfile, placeDetails, searchPlaces, updateProfile } from '../lib
 import { AVATARS, avatarImage } from '../lib/assets.js';
 import { writeActive } from '../lib/active-profile.js';
 import { checkDate, checkTime, coordText, formatDate, formatTime } from '../lib/date-input.js';
+import { t } from '../i18n/index.js';
 
 /* Everything but "self", which the first entry gets by default on the API. */
 const RELATIONSHIPS = ['spouse', 'partner', 'parent', 'child', 'sibling', 'friend', 'other'];
@@ -32,7 +33,7 @@ function fromProfile(p) {
 
 /** The birth entry form. Creates the profile, makes it the active one, then hands the new id to onSaved.
     With `profile` it edits that entry instead. withRelationship adds the "who they are to you" row for entries about someone else. */
-export default function ProfileForm({ defaultName = [], profile = null, withRelationship = false, submitLabel = 'Draw my chart', busyLabel = 'Drawing…', onSaved }) {
+export default function ProfileForm({ defaultName = [], profile = null, withRelationship = false, submitLabel = t('Draw my chart'), busyLabel = t('Drawing…'), onSaved }) {
   const navigate = useNavigate();
   const init = fromProfile(profile);
   const [firstName, setFirstName] = useState(init?.firstName ?? defaultName[0] ?? '');
@@ -89,12 +90,12 @@ export default function ProfileForm({ defaultName = [], profile = null, withRela
   const showSuggestions = focused && hits.length > 0 && !exact;
   // what still stands between the user and the button, in their words
   const missing = [
-    !firstName.trim() && 'first name',
-    !lastName.trim() && 'last name',
-    !dv.iso && (dv.error ? `date of birth: ${dv.error}` : dv.partial ? 'date of birth: finish it as DD / MM / YYYY' : 'date of birth'),
-    !noTime && !tv.hm && (tv.error ? `time of birth: ${tv.error}` : "time of birth, or tick \"I don't know\""),
-    !exact && (place.trim() ? 'place of birth: choose it from the list' : 'place of birth'),
-    withRelationship && !relationship && 'who they are to you'
+    !firstName.trim() && t('first name'),
+    !lastName.trim() && t('last name'),
+    !dv.iso && (dv.error ? t('date of birth: {error}', { error: dv.error }) : dv.partial ? t('date of birth: finish it as DD / MM / YYYY') : t('date of birth')),
+    !noTime && !tv.hm && (tv.error ? t('time of birth: {error}', { error: tv.error }) : t("time of birth, or tick \"I don't know\"")),
+    !exact && (place.trim() ? t('place of birth: choose it from the list') : t('place of birth')),
+    withRelationship && !relationship && t('who they are to you')
   ].filter(Boolean);
   const ready = missing.length === 0 && !resolving;
 
@@ -130,34 +131,34 @@ export default function ProfileForm({ defaultName = [], profile = null, withRela
     <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid #F4ECDC' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 24px', borderBottom: '1px solid rgba(244,236,220,.25)' }}>
         <label style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 6, padding: '16px 0 14px' }}>
-          <span style={lbl}>i · First name</span>
+          <span style={lbl}>{t('i · First name')}</span>
           <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Ana" autoComplete="given-name" style={bigInput} />
         </label>
         <label style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 6, padding: '16px 0 14px' }}>
-          <span style={{ ...lbl, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}><span>Last name</span><span style={{ color: 'rgba(244,236,220,.35)' }}>As you'd like it written</span></span>
+          <span style={{ ...lbl, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}><span>{t('Last name')}</span><span style={{ color: 'rgba(244,236,220,.35)' }}>{t("As you'd like it written")}</span></span>
           <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Rodrigues" autoComplete="family-name" style={bigInput} />
         </label>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 24px', borderBottom: '1px solid rgba(244,236,220,.25)' }}>
         <label style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column', gap: 6, padding: '16px 0 14px' }}>
-          <span style={lbl}>ii · Date of birth</span>
-          <input type="text" inputMode="numeric" value={date} onChange={e => setDate(formatDate(e.target.value))} placeholder="DD / MM / YYYY" style={monoInput} />
+          <span style={lbl}>{t('ii · Date of birth')}</span>
+          <input type="text" inputMode="numeric" value={date} onChange={e => setDate(formatDate(e.target.value))} placeholder={t('DD / MM / YYYY')} style={monoInput} />
           {dv.error && <span style={err}>{dv.error}</span>}
         </label>
         <label style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: 6, padding: '16px 0 14px', opacity: noTime ? .35 : 1 }}>
-          <span style={lbl}>iii · Time of birth</span>
-          <input type="text" inputMode="numeric" value={time} onChange={e => setTime(formatTime(e.target.value))} disabled={noTime} placeholder="HH : MM" style={monoInput} />
+          <span style={lbl}>{t('iii · Time of birth')}</span>
+          <input type="text" inputMode="numeric" value={time} onChange={e => setTime(formatTime(e.target.value))} disabled={noTime} placeholder={t('HH : MM')} style={monoInput} />
           {tv.error && !noTime && <span style={err}>{tv.error}</span>}
         </label>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '16px 0 14px', borderBottom: '1px solid rgba(244,236,220,.25)', position: 'relative', zIndex: 10 }}>
         <span style={{ ...lbl, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-          <span>iv · Place of birth</span>
-          <span style={{ color: '#5F8B7A' }}>{resolving ? 'Locating…' : exact ? coordText(picked.lat, picked.lon) : ''}</span>
+          <span>{t('iv · Place of birth')}</span>
+          <span style={{ color: '#5F8B7A' }}>{resolving ? t('Locating…') : exact ? coordText(picked.lat, picked.lon) : ''}</span>
         </span>
-        <input type="text" value={place} onChange={e => { setPlace(e.target.value); setPicked(null); }} onFocus={() => setFocused(true)} onBlur={() => setTimeout(() => setFocused(false), 120)} placeholder="Start typing a city" autoComplete="off" style={bigInput} />
+        <input type="text" value={place} onChange={e => { setPlace(e.target.value); setPicked(null); }} onFocus={() => setFocused(true)} onBlur={() => setTimeout(() => setFocused(false), 120)} placeholder={t('Start typing a city')} autoComplete="off" style={bigInput} />
         {exact && <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED }}>{[picked.city, picked.state, picked.country].filter(Boolean).join(' · ')}</span>}
         {showSuggestions && (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, position: 'absolute', left: -12, right: -12, top: '100%', zIndex: 5, background: '#1C2538', border: '1px solid #F4ECDC', boxShadow: '0 10px 24px rgba(244,236,220,.14)', maxHeight: 230, overflow: 'auto', animation: 'om-fade .16s ease both' }}>
@@ -175,12 +176,12 @@ export default function ProfileForm({ defaultName = [], profile = null, withRela
 
       {withRelationship && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 0 14px', borderBottom: '1px solid rgba(244,236,220,.25)' }}>
-          <span style={lbl}>v · Who they are to you</span>
+          <span style={lbl}>{t('v · Who they are to you')}</span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {RELATIONSHIPS.map(r => {
               const on = r === relationship;
               return (
-                <button key={r} type="button" onClick={() => setRelationship(r)} aria-pressed={on} className={on ? '' : 'hov-wash-10'} style={{ padding: '7px 13px', borderRadius: 2, cursor: 'pointer', fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: on ? '#1C2538' : '#F4ECDC', background: on ? '#F4ECDC' : 'transparent', border: on ? '1px solid #F4ECDC' : '1px solid rgba(244,236,220,.35)' }}>{r}</button>
+                <button key={r} type="button" onClick={() => setRelationship(r)} aria-pressed={on} className={on ? '' : 'hov-wash-10'} style={{ padding: '7px 13px', borderRadius: 2, cursor: 'pointer', fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: on ? '#1C2538' : '#F4ECDC', background: on ? '#F4ECDC' : 'transparent', border: on ? '1px solid #F4ECDC' : '1px solid rgba(244,236,220,.35)' }}>{t(r)}</button>
               );
             })}
           </div>
@@ -188,12 +189,12 @@ export default function ProfileForm({ defaultName = [], profile = null, withRela
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 0 14px', borderBottom: '1px solid rgba(244,236,220,.25)' }}>
-        <span style={{ ...lbl, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}><span>{withRelationship ? 'vi' : 'v'} · Portrait</span><span style={{ color: 'rgba(244,236,220,.35)' }}>Optional</span></span>
+        <span style={{ ...lbl, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}><span>{withRelationship ? 'vi' : 'v'} · {t('Portrait')}</span><span style={{ color: 'rgba(244,236,220,.35)' }}>{t('Optional')}</span></span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {AVATARS.map(id => {
             const on = id === avatar;
             return (
-              <button key={id} type="button" onClick={() => setAvatar(on ? '' : id)} aria-label={`Portrait ${id.slice(-2)}`} aria-pressed={on} style={{ width: 52, height: 52, padding: 0, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', background: 'rgba(244,236,220,.08)', border: on ? '2px solid #B4933F' : '1px solid rgba(244,236,220,.3)', boxShadow: on ? '0 0 0 3px rgba(180,147,63,.25)' : 'none', opacity: avatar && !on ? .55 : 1, transition: 'opacity .15s, box-shadow .15s' }}>
+              <button key={id} type="button" onClick={() => setAvatar(on ? '' : id)} aria-label={t('Portrait {n}', { n: id.slice(-2) })} aria-pressed={on} style={{ width: 52, height: 52, padding: 0, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', background: 'rgba(244,236,220,.08)', border: on ? '2px solid #B4933F' : '1px solid rgba(244,236,220,.3)', boxShadow: on ? '0 0 0 3px rgba(180,147,63,.25)' : 'none', opacity: avatar && !on ? .55 : 1, transition: 'opacity .15s, box-shadow .15s' }}>
                 <img src={avatarImage(id)} alt="" loading="lazy" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </button>
             );
@@ -205,19 +206,19 @@ export default function ProfileForm({ defaultName = [], profile = null, withRela
         <button type="button" onClick={() => setNoTime(v => !v)} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#F4ECDC', font: 'inherit' }}>
           <span style={{ flex: '0 0 auto', width: 18, height: 18, marginTop: 1, border: '1px solid #F4ECDC', background: noTime ? '#F4ECDC' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: 12, color: '#1C2538', lineHeight: 1 }}>{noTime ? '✓' : ''}</span>
           <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 15, fontWeight: 500 }}>{withRelationship ? "I don't know their birth time" : "I don't know my birth time"}</span>
-            <span style={{ fontSize: 13, lineHeight: 1.45, color: MUTED }}>Very common. Tick this and we'll compute from midnight.</span>
+            <span style={{ fontSize: 15, fontWeight: 500 }}>{withRelationship ? t("I don't know their birth time") : t("I don't know my birth time")}</span>
+            <span style={{ fontSize: 13, lineHeight: 1.45, color: MUTED }}>{t("Very common. Tick this and we'll compute from midnight.")}</span>
           </span>
         </button>
         {noTime && (
           <div style={{ border: '1px solid rgba(244,236,220,.3)', borderLeft: '2px solid #B4933F', background: 'rgba(244,236,220,.08)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, animation: 'om-rise .28s cubic-bezier(.3,0,.2,1) both' }}>
-            <span style={lbl}>What changes without a time</span>
+            <span style={lbl}>{t('What changes without a time')}</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14, lineHeight: 1.5 }}>
-              <div style={{ display: 'flex', gap: 10 }}><span style={{ fontFamily: MONO, color: '#5F8B7A', flex: '0 0 auto' }}>✓</span><span><strong style={{ fontWeight: 500 }}>Still exact:</strong> Sun, Mercury, Venus, Mars and the outer planets. Their signs and aspects barely move in a day.</span></div>
-              <div style={{ display: 'flex', gap: 10 }}><span style={{ fontFamily: MONO, color: '#B4933F', flex: '0 0 auto' }}>~</span><span><strong style={{ fontWeight: 500 }}>Approximate:</strong> the Moon, which travels about 13° a day, so it can land in the neighbouring sign.</span></div>
-              <div style={{ display: 'flex', gap: 10 }}><span style={{ fontFamily: MONO, color: '#B4933F', flex: '0 0 auto' }}>~</span><span><strong style={{ fontWeight: 500 }}>Provisional:</strong> the Ascendant, Midheaven and houses are drawn from midnight. They move a full circle in a day, so treat them as a placeholder until you find the time.</span></div>
+              <div style={{ display: 'flex', gap: 10 }}><span style={{ fontFamily: MONO, color: '#5F8B7A', flex: '0 0 auto' }}>✓</span><span><strong style={{ fontWeight: 500 }}>{t('Still exact:')}</strong> {t('Sun, Mercury, Venus, Mars and the outer planets. Their signs and aspects barely move in a day.')}</span></div>
+              <div style={{ display: 'flex', gap: 10 }}><span style={{ fontFamily: MONO, color: '#B4933F', flex: '0 0 auto' }}>~</span><span><strong style={{ fontWeight: 500 }}>{t('Approximate:')}</strong> {t('the Moon, which travels about 13° a day, so it can land in the neighbouring sign.')}</span></div>
+              <div style={{ display: 'flex', gap: 10 }}><span style={{ fontFamily: MONO, color: '#B4933F', flex: '0 0 auto' }}>~</span><span><strong style={{ fontWeight: 500 }}>{t('Provisional:')}</strong> {t('the Ascendant, Midheaven and houses are drawn from midnight. They move a full circle in a day, so treat them as a placeholder until you find the time.')}</span></div>
             </div>
-            <span style={{ fontSize: 13, color: MUTED, borderTop: '1px solid rgba(244,236,220,.2)', paddingTop: 9 }}>A birth certificate or hospital record usually has it. You can add it later and the chart will redraw.</span>
+            <span style={{ fontSize: 13, color: MUTED, borderTop: '1px solid rgba(244,236,220,.2)', paddingTop: 9 }}>{t('A birth certificate or hospital record usually has it. You can add it later and the chart will redraw.')}</span>
           </div>
         )}
       </div>
@@ -232,8 +233,8 @@ export default function ProfileForm({ defaultName = [], profile = null, withRela
         <span style={{ fontFamily: MONO, fontSize: 14, opacity: .8 }}>→</span>
       </button>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED, flexWrap: 'wrap' }}>
-        <span style={{ color: ready ? MUTED : '#B4933F', textWrap: 'pretty' }}>{ready ? 'Entry complete' : resolving ? 'Locating the place…' : `Still needed: ${missing.join(' · ')}`}</span>
-        <span>Free · No card</span>
+        <span style={{ color: ready ? MUTED : '#B4933F', textWrap: 'pretty' }}>{ready ? t('Entry complete') : resolving ? t('Locating the place…') : t('Still needed: {list}', { list: missing.join(' · ') })}</span>
+        <span>{t('Free · No card')}</span>
       </div>
     </div>
     </div>

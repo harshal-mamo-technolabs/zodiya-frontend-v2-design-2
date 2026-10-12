@@ -4,8 +4,9 @@ import Starfield from '../components/Starfield.jsx';
 import NavMenu, { AddProfile } from '../components/NavMenu.jsx';
 import { deleteMe, getMe, listProfiles, logout, placeDetails, searchPlaces, setProfileDisabled, updateMe, updateProfile } from '../lib/api.js';
 import { clearActive, readActive } from '../lib/active-profile.js';
-import { EDIT_LIMITS, editsText, forgetStatus, getStatus, longDate, packName } from '../lib/billing.js';
-import { checkDate, checkTime, coordText, formatDate, formatTime, MONTHS } from '../lib/date-input.js';
+import { EDIT_LIMITS, editsText, forgetStatus, getStatus, longDate, packName, useSales } from '../lib/billing.js';
+import { checkDate, checkTime, coordText, formatDate, formatTime } from '../lib/date-input.js';
+import { locale, t } from '../i18n/index.js';
 
 /* A port of Account.dc.html: who you are, your birth entry, the people you saved,
    your plan, and the way out. Every control does what it says. */
@@ -27,8 +28,8 @@ const mono10 = { fontFamily: MONO, fontSize: 10, letterSpacing: '.06em', color: 
 const quiet = { fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.45)', borderBottom: 'none', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' };
 const rowInput = { flex: 1, minWidth: 0, border: 'none', background: 'transparent', padding: '2px 0', fontFamily: MONO, fontSize: 16, letterSpacing: '.04em', color: INK };
 
-const dob = iso => { const [y, m, d] = iso.split('-'); return `${d} ${MONTHS[+m - 1]} ${y}`; };
-const editedOn = iso => { const d = new Date(iso); return `Last edited ${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+const dob = iso => { const [y, m, d] = iso.split('-'); return new Date(+y, m - 1, +d).toLocaleDateString(locale(), { day: '2-digit', month: 'short', year: 'numeric' }); };
+const editedOn = iso => t('Last edited {date}', { date: new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'short' }) });
 const initials = (a, b) => `${(a || '').trim().charAt(0)}${(b || '').trim().charAt(0)}`.toUpperCase();
 
 
@@ -116,7 +117,9 @@ export default function Account() {
   const dirty = state === 'dirty';
   // every save that changes the name or birth data uses one of a lifetime few
   const locked = !!own && own.editsLeft === 0;
-  const slots = billing ? billing.profiles.included + billing.profiles.extra : null;
+  const sales = useSales();
+  // payments off: no slots, just a count
+  const slots = billing && billing.paymentsEnabled !== false ? billing.profiles.included + billing.profiles.extra : null;
 
   const save = async () => {
     if (!dirty || !valid || !own || locked) return;
@@ -170,10 +173,10 @@ export default function Account() {
   };
 
   const birthRows = fields ? [
-    ['Full name', 'name', '', v => v],
-    ['Date of birth', 'date', dv.error || '', formatDate],
-    ['Time of birth', 'time', tv.error || 'Sets your rising', formatTime],
-    ['Birthplace', 'place', exact ? coordText(picked.lat, picked.lon) : 'Pick from the list', v => v]
+    [t('Full name'), 'name', '', v => v],
+    [t('Date of birth'), 'date', dv.error || '', formatDate],
+    [t('Time of birth'), 'time', tv.error || t('Sets your rising'), formatTime],
+    [t('Birthplace'), 'place', exact ? coordText(picked.lat, picked.lon) : t('Pick from the list'), v => v]
   ] : [];
 
   return (
@@ -185,7 +188,7 @@ export default function Account() {
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.6)' }}>Account</span>
+          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.6)' }}>{t('Account')}</span>
           <NavMenu current="Account" />
         </div>
       </header>
@@ -203,8 +206,8 @@ export default function Account() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: 1 }}>
                 {editing ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px' }}>
-                    <input className="acc-input" value={first} onChange={e => setFirst(e.target.value)} placeholder="First name" aria-label="First name" style={{ ...rowInput, flex: '1 1 140px', fontFamily: SERIF, fontSize: 24, borderBottom: '1px solid rgba(244,236,220,.3)' }} />
-                    <input className="acc-input" value={last} onChange={e => setLast(e.target.value)} placeholder="Last name" aria-label="Last name" style={{ ...rowInput, flex: '1 1 140px', fontFamily: SERIF, fontSize: 24, borderBottom: '1px solid rgba(244,236,220,.3)' }} />
+                    <input className="acc-input" value={first} onChange={e => setFirst(e.target.value)} placeholder={t('First name')} aria-label={t('First name')} style={{ ...rowInput, flex: '1 1 140px', fontFamily: SERIF, fontSize: 24, borderBottom: '1px solid rgba(244,236,220,.3)' }} />
+                    <input className="acc-input" value={last} onChange={e => setLast(e.target.value)} placeholder={t('Last name')} aria-label={t('Last name')} style={{ ...rowInput, flex: '1 1 140px', fontFamily: SERIF, fontSize: 24, borderBottom: '1px solid rgba(244,236,220,.3)' }} />
                   </div>
                 ) : (
                   <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 28, lineHeight: 1.1 }}>{me.firstName} {me.lastName}</h1>
@@ -213,22 +216,22 @@ export default function Account() {
               </div>
               {editing ? (
                 <div style={{ display: 'flex', gap: 14, flex: '0 0 auto' }}>
-                  <button type="button" onClick={saveName} disabled={busy || !first.trim() || !last.trim()} className="acc-quiet" style={{ ...quiet, color: 'rgba(244,236,220,.68)', fontSize: 10, letterSpacing: '.12em' }}>Save</button>
-                  <button type="button" onClick={() => { setEditing(false); setFirst(me.firstName); setLast(me.lastName); }} className="acc-quiet" style={{ ...quiet, fontSize: 10, letterSpacing: '.12em' }}>Cancel</button>
+                  <button type="button" onClick={saveName} disabled={busy || !first.trim() || !last.trim()} className="acc-quiet" style={{ ...quiet, color: 'rgba(244,236,220,.68)', fontSize: 10, letterSpacing: '.12em' }}>{t('Save')}</button>
+                  <button type="button" onClick={() => { setEditing(false); setFirst(me.firstName); setLast(me.lastName); }} className="acc-quiet" style={{ ...quiet, fontSize: 10, letterSpacing: '.12em' }}>{t('Cancel')}</button>
                 </div>
               ) : (
-                <button type="button" onClick={() => setEditing(true)} className="acc-quiet" style={{ ...quiet, marginLeft: 'auto', flex: '0 0 auto', color: 'rgba(244,236,220,.68)', fontSize: 10, letterSpacing: '.12em' }}>Edit</button>
+                <button type="button" onClick={() => setEditing(true)} className="acc-quiet" style={{ ...quiet, marginLeft: 'auto', flex: '0 0 auto', color: 'rgba(244,236,220,.68)', fontSize: 10, letterSpacing: '.12em' }}>{t('Edit')}</button>
               )}
             </section>
 
             {/* ---------------------------------------------- birth details */}
             <section style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .12s both' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingBottom: 10, borderBottom: `1px solid ${INK}` }}>
-                <h2 style={h2}>Birth details</h2>
-                <span style={mono10}>{!own ? 'Nothing saved yet' : state === 'saved' ? 'Saved' : dirty ? 'Unsaved changes' : state === 'saving' ? 'Saving' : `${editedOn(own.updatedAt)} · ${editsText(own.editsLeft)}`}</span>
+                <h2 style={h2}>{t('Birth details')}</h2>
+                <span style={mono10}>{!own ? t('Nothing saved yet') : state === 'saved' ? t('Saved') : dirty ? t('Unsaved changes') : state === 'saving' ? t('Saving') : `${editedOn(own.updatedAt)} · ${editsText(own.editsLeft)}`}</span>
               </div>
               {!fields && (
-                <Link to="/birth-details" style={{ padding: '14px 0', fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>+ Add your birth details</Link>
+                <Link to="/birth-details" style={{ padding: '14px 0', fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>{t('+ Add your birth details')}</Link>
               )}
               {fields && birthRows.map(([label, key, hint, format]) => (
                 <label key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 16, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)', position: 'relative' }}>
@@ -251,8 +254,8 @@ export default function Account() {
               ))}
               {fields && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 14 }}>
-                  <span style={{ fontSize: 12.5, lineHeight: 1.5, color: locked ? GOLD : 'rgba(244,236,220,.55)', textWrap: 'pretty' }}>{locked ? `All ${EDIT_LIMITS.primary} edits are used, so your birth details are now fixed.` : ''}</span>
-                  <button type="button" onClick={save} disabled={!dirty || !valid || state === 'saving'} style={{ flex: '0 0 auto', border: `1px solid ${dirty && valid ? INK : 'rgba(244,236,220,.25)'}`, background: dirty && valid ? 'rgba(244,236,220,.12)' : 'transparent', color: dirty && valid ? INK : 'rgba(244,236,220,.45)', padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: dirty && valid ? 'pointer' : 'default', transition: 'background .2s ease,color .2s ease' }}>{state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving' : 'Save changes'}</button>
+                  <span style={{ fontSize: 12.5, lineHeight: 1.5, color: locked ? GOLD : 'rgba(244,236,220,.55)', textWrap: 'pretty' }}>{locked ? t('All {n} edits are used, so your birth details are now fixed.', { n: EDIT_LIMITS.primary }) : ''}</span>
+                  <button type="button" onClick={save} disabled={!dirty || !valid || state === 'saving'} style={{ flex: '0 0 auto', border: `1px solid ${dirty && valid ? INK : 'rgba(244,236,220,.25)'}`, background: dirty && valid ? 'rgba(244,236,220,.12)' : 'transparent', color: dirty && valid ? INK : 'rgba(244,236,220,.45)', padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: dirty && valid ? 'pointer' : 'default', transition: 'background .2s ease,color .2s ease' }}>{state === 'saved' ? t('Saved') : state === 'saving' ? t('Saving') : t('Save changes')}</button>
                 </div>
               )}
             </section>
@@ -260,50 +263,50 @@ export default function Account() {
             {/* ------------------------------------------------ saved people */}
             <section style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .18s both' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingBottom: 10, borderBottom: `1px solid ${INK}` }}>
-                <h2 style={h2}>Saved people</h2>
-                <span style={mono10}>{slots == null ? `${people.length} saved` : `${billing.profiles.used} of ${slots} slots used${billing.profiles.extra ? ` · ${packName(billing.profiles)} pack` : ''}`}</span>
+                <h2 style={h2}>{t('Saved people')}</h2>
+                <span style={mono10}>{slots == null ? t('{n} saved', { n: people.length }) : `${t('{used} of {total} slots used', { used: billing.profiles.used, total: slots })}${billing.profiles.extra ? ` · ${t('{pack} pack', { pack: packName(billing.profiles) })}` : ''}`}</span>
               </div>
               {people.map(p => (
                 <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)', opacity: p.disabled ? 0.55 : 1 }}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-                    <span style={{ fontSize: 14.5 }}>{p.firstName} {p.lastName}{p.disabled && <span style={{ ...mono10, marginLeft: 8, color: GOLD }}>OFF</span>}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.05em', color: 'rgba(244,236,220,.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dob(p.birthDate)} · {p.birthTime} · {p.city}{p.relationship && p.relationship !== 'self' ? ` · ${p.relationship}` : ''} · {editsText(p.editsLeft)}</span>
+                    <span style={{ fontSize: 14.5 }}>{p.firstName} {p.lastName}{p.disabled && <span style={{ ...mono10, marginLeft: 8, color: GOLD }}>{t('OFF')}</span>}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.05em', color: 'rgba(244,236,220,.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dob(p.birthDate)} · {p.birthTime} · {p.city}{p.relationship && p.relationship !== 'self' ? ` · ${t(p.relationship)}` : ''} · {editsText(p.editsLeft)}</span>
                   </div>
-                  {!p.disabled && <Link to={`/synastry?with=${p._id}`} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>Open</Link>}
-                  {!p.disabled && p.editsLeft > 0 && <Link to={`/birth-details?id=${p._id}`} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>Edit</Link>}
-                  <button type="button" onClick={() => switchProfile(p)} disabled={switching === p._id} aria-pressed={!p.disabled} className="acc-toggle" style={{ flex: '0 0 auto', border: 'none', background: 'transparent', color: 'rgba(244,236,220,.45)', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer', padding: 4 }}>{switching === p._id ? '…' : p.disabled ? 'Switch on' : 'Switch off'}</button>
+                  {!p.disabled && <Link to={`/synastry?with=${p._id}`} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>{t('Open')}</Link>}
+                  {!p.disabled && p.editsLeft > 0 && <Link to={`/birth-details?id=${p._id}`} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>{t('Edit')}</Link>}
+                  <button type="button" onClick={() => switchProfile(p)} disabled={switching === p._id} aria-pressed={!p.disabled} className="acc-toggle" style={{ flex: '0 0 auto', border: 'none', background: 'transparent', color: 'rgba(244,236,220,.45)', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer', padding: 4 }}>{switching === p._id ? '…' : p.disabled ? t('Switch on') : t('Switch off')}</button>
                 </div>
               ))}
-              <button type="button" onClick={() => setAdding(true)} className="acc-quiet" style={{ ...quiet, alignSelf: 'flex-start', paddingTop: 14, fontSize: 10, letterSpacing: '.12em', color: 'rgba(244,236,220,.68)' }}>+ Add someone</button>
+              <button type="button" onClick={() => setAdding(true)} className="acc-quiet" style={{ ...quiet, alignSelf: 'flex-start', paddingTop: 14, fontSize: 10, letterSpacing: '.12em', color: 'rgba(244,236,220,.68)' }}>{t('+ Add someone')}</button>
             </section>
 
             {/* ------------------------------------------------ plan */}
-            <section style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .3s both' }}>
+            {sales !== false && <section style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .3s both' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingBottom: 10, borderBottom: `1px solid ${INK}` }}>
-                <h2 style={h2}>Plan</h2>
-                <span style={mono10}>{billing && billing.plan && billing.entitled ? (billing.plan.cancelAtPeriodEnd ? `Ends ${longDate(billing.plan.currentPeriodEnd)}` : `Renews ${longDate(billing.plan.currentPeriodEnd)}`) : ''}</span>
+                <h2 style={h2}>{t('Plan')}</h2>
+                <span style={mono10}>{billing && billing.plan && billing.entitled ? t(billing.plan.cancelAtPeriodEnd ? 'Ends {date}' : 'Renews {date}', { date: longDate(billing.plan.currentPeriodEnd) }) : ''}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)' }}>
-                <span style={{ flex: 1, fontSize: 14.5 }}>{!billing ? '…' : billing.entitled ? `${billing.plan.name}${billing.plan.trial ? ' trial' : ''} · ${Math.floor(billing.minutes.total / 60)} astrologer minutes left` : 'No active plan'}</span>
-                <Link to={billing && billing.entitled ? '/billing' : '/subscription'} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>{billing && billing.entitled ? 'Manage' : 'See plans'}</Link>
+                <span style={{ flex: 1, fontSize: 14.5 }}>{!billing ? '…' : billing.entitled ? t('{plan} · {n} astrologer minutes left', { plan: billing.plan.trial ? t('{plan} trial', { plan: billing.plan.name }) : billing.plan.name, n: Math.floor(billing.minutes.total / 60) }) : t('No active plan')}</span>
+                <Link to={billing && billing.entitled ? '/billing' : '/subscription'} style={{ flex: '0 0 auto', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.68)', borderBottom: 'none' }}>{billing && billing.entitled ? t('Manage') : t('See plans')}</Link>
               </div>
-            </section>
+            </section>}
 
             {/* ------------------------------------------------ the way out */}
             <section style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 6, animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) .36s both' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <button type="button" onClick={signOut} className="acc-line" style={{ background: 'transparent', color: INK, padding: '10px 20px', border: '1px solid rgba(244,236,220,.3)', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>Log out</button>
+                <button type="button" onClick={signOut} className="acc-line" style={{ background: 'transparent', color: INK, padding: '10px 20px', border: '1px solid rgba(244,236,220,.3)', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>{t('Log out')}</button>
                 <div style={{ display: 'flex', gap: 18 }}>
-                  <button type="button" onClick={exportData} className="acc-quiet" style={quiet}>Export data</button>
-                  <button type="button" onClick={() => setDeleteOpen(o => !o)} className="acc-remove" style={quiet}>Delete account</button>
+                  <button type="button" onClick={exportData} className="acc-quiet" style={quiet}>{t('Export data')}</button>
+                  <button type="button" onClick={() => setDeleteOpen(o => !o)} className="acc-remove" style={quiet}>{t('Delete account')}</button>
                 </div>
               </div>
               {deleteOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 14, borderTop: '1px solid rgba(244,236,220,.18)', animation: 'om-fade .25s ease both' }}>
-                  <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.72)', textWrap: 'pretty' }}>This cancels your plan straight away and removes your account, your chart and everyone you have saved. There is no refund and no undo. Export your data first if you want to keep it.</p>
+                  <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.72)', textWrap: 'pretty' }}>{t('This cancels your plan straight away and removes your account, your chart and everyone you have saved. There is no refund and no undo. Export your data first if you want to keep it.')}</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                    <button type="button" onClick={deleteAccount} disabled={busy} style={{ border: '1px solid rgba(196,106,90,.7)', background: 'transparent', color: RED, padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>{busy ? 'Deleting' : 'Confirm deletion'}</button>
-                    <button type="button" onClick={() => setDeleteOpen(false)} className="acc-quiet" style={{ ...quiet, color: 'rgba(244,236,220,.55)', padding: '9px 4px', fontSize: 10, letterSpacing: '.14em' }}>Keep it</button>
+                    <button type="button" onClick={deleteAccount} disabled={busy} style={{ border: '1px solid rgba(196,106,90,.7)', background: 'transparent', color: RED, padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>{busy ? t('Deleting') : t('Confirm deletion')}</button>
+                    <button type="button" onClick={() => setDeleteOpen(false)} className="acc-quiet" style={{ ...quiet, color: 'rgba(244,236,220,.55)', padding: '9px 4px', fontSize: 10, letterSpacing: '.14em' }}>{t('Keep it')}</button>
                   </div>
                 </div>
               )}

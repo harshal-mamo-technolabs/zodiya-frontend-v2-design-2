@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
-import { cancelPlan, getCard, listInvoices, listProfiles, resumePlan } from '../lib/api.js';
-import { cadence, EDIT_LIMITS, editsText, euros, forgetStatus, getCatalog, getStatus, longDate, packName } from '../lib/billing.js';
+import { cancelPlan, getCard, listReceipts, listProfiles, resumePlan } from '../lib/api.js';
+import { EDIT_LIMITS, editsText, euros, every, forgetStatus, getCatalog, getStatus, longDate, packName } from '../lib/billing.js';
+import { getLang, t } from '../i18n/index.js';
 
 /* Plan, minutes, profiles, card and receipts, and a way to change each. */
 
@@ -25,12 +26,12 @@ const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 function planLine(plan) {
   if (!plan) return '';
   const end = plan.currentPeriodEnd ? longDate(plan.currentPeriodEnd) : '';
-  if (plan.status === 'past_due' || plan.status === 'unpaid') return 'Payment failed · app paused';
-  if (plan.status === 'canceled' || plan.status === 'incomplete_expired') return 'Ended';
-  if (plan.status === 'incomplete') return 'Waiting for the first payment';
-  if (plan.cancelAtPeriodEnd) return `Ends ${end}`;
-  if (plan.trial) return `Trial · ${plan.name} starts ${end}`;
-  return `Renews ${end}`;
+  if (plan.status === 'past_due' || plan.status === 'unpaid') return t('Payment failed · app paused');
+  if (plan.status === 'canceled' || plan.status === 'incomplete_expired') return t('Ended');
+  if (plan.status === 'incomplete') return t('Waiting for the first payment');
+  if (plan.cancelAtPeriodEnd) return t('Ends {date}', { date: end });
+  if (plan.trial) return t('Trial · {plan} starts {date}', { plan: plan.name, date: end });
+  return t('Renews {date}', { date: end });
 }
 
 export default function Billing() {
@@ -38,11 +39,10 @@ export default function Billing() {
   const [status, setStatus] = useState(null);
   const [catalog, setCatalog] = useState(null);
   const [card, setCard] = useState(undefined);
-  const [invoices, setInvoices] = useState(null);
+  const [receipts, setReceipts] = useState(null);
   const [error, setError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [qty, setQty] = useState({});
   const [people, setPeople] = useState(null);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function Billing() {
     getStatus().then(setStatus).catch(e => (e.status === 401 ? navigate('/login') : setError(e.message)));
     getCatalog().then(setCatalog).catch(e => setError(e.message));
     getCard().then(r => setCard(r.card)).catch(() => setCard(null));
-    listInvoices().then(setInvoices).catch(() => setInvoices([]));
+    listReceipts().then(setReceipts).catch(() => setReceipts([]));
     listProfiles(true).then(setPeople).catch(() => setPeople([]));
   }, [navigate]);
 
@@ -80,122 +80,130 @@ export default function Billing() {
 
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '32px 24px 56px', display: 'flex', flexDirection: 'column', gap: 30 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: SAGE }}>Plan & billing</span>
-          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,7vw,42px)', lineHeight: 1.08 }}>{plan && status.entitled ? `${plan.trial ? `${plan.name} trial` : plan.name}, ${plan.cancelAtPeriodEnd ? 'ending soon' : 'active'}.` : 'No active plan.'}</h1>
+          <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: SAGE }}>{t('Plan & billing')}</span>
+          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,7vw,42px)', lineHeight: 1.08 }}>{plan && status.entitled ? t(plan.cancelAtPeriodEnd ? '{plan}, ending soon.' : '{plan}, active.', { plan: plan.trial ? t('{plan} trial', { plan: plan.name }) : plan.name }) : t('No active plan.')}</h1>
         </div>
 
         {error && <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14 }}>{error}</div>}
 
         {status && catalog && (
           <>
+            {/* ------------------------------------------- the three at a glance */}
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', animation: 'om-rise .45s cubic-bezier(.3,0,.2,1) both' }}>
+              {[
+                ['membership', t('01 · Membership'), tier && status.entitled ? (plan.trial ? t('{plan} trial', { plan: tier.name }) : tier.name) : t('No plan'), planLine(plan) || t('Choose a plan to start')],
+                ['astrologer', t('02 · AI astrologer'), t('{n} min left', { n: mins(status.minutes.total) }), t('{plan} plan · {topup} top-up', { plan: mins(status.minutes.plan), topup: mins(status.minutes.topup) })],
+                ['profiles', t('03 · Profiles'), t('{used} of {total} slots', { used: status.profiles.used, total: status.profiles.included + status.profiles.extra }), status.profiles.pack ? t('{pack} pack', { pack: packName(catalog.profilePacks.find(x => x.id === status.profiles.pack)) }) : t('Your own profile only')]
+              ].map(([id, label, value, note]) => (
+                <button key={id} type="button" onClick={() => document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' })} className="bl-line" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: '16px 16px 14px', border: '1px solid rgba(244,236,220,.22)', background: 'rgba(17,23,37,.55)', color: INK, textAlign: 'left', cursor: 'pointer', font: 'inherit' }}>
+                  <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>{label}</span>
+                  <span style={{ fontFamily: SERIF, fontSize: 26, lineHeight: 1.05 }}>{value}</span>
+                  <span style={mono10}>{note}</span>
+                </button>
+              ))}
+            </div>
+
             {/* ----------------------------------------------------- plan */}
-            <section style={section(0.05)}>
-              <div style={head}><h2 style={h2}>Plan</h2><span style={{ ...mono10, color: failed ? RED : MUTED }}>{planLine(plan) || 'None'}</span></div>
+            <Card id="membership" n="01" title={t('Membership')} delay={0.05} status={<span style={{ ...mono10, color: failed ? RED : MUTED }}>{planLine(plan) || t('None')}</span>}>
               {failed && (
                 <div style={{ ...row, borderLeft: `2px solid ${RED}`, paddingLeft: 12, background: 'rgba(196,106,90,.1)' }}>
-                  <span style={{ flex: 1, fontSize: 14, lineHeight: 1.5 }}>Your renewal payment failed. Pay the invoice, or replace your card below and pay it.</span>
-                  <Link to="/checkout?item=invoice&kind=plan" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>Pay now</Link>
+                  <span style={{ flex: 1, fontSize: 14, lineHeight: 1.5 }}>{t('Your renewal payment failed. Pay the invoice, or replace your card below and pay it.')}</span>
+                  <Link to="/checkout?item=invoice&kind=plan" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{t('Pay now')}</Link>
                 </div>
               )}
               {tier && status.entitled ? (
                 <div style={row}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <span style={{ fontSize: 15 }}>{tier.name} · {euros(tier.amount)} every {cadence(tier.months)}</span>
-                    <span style={mono10}>{plan.trial ? `${catalog.trial.minutes} astrologer minutes during the trial` : `${tier.minutes} astrologer minutes every ${cadence(tier.months)}`}</span>
+                    <span style={{ fontSize: 15 }}>{tier.name} · {euros(tier.amount)} {every(tier.months)}</span>
+                    <span style={mono10}>{plan.trial ? t('{minutes} astrologer minutes during the trial', { minutes: catalog.trial.minutes }) : t('{minutes} astrologer minutes {every}', { minutes: tier.minutes, every: every(tier.months) })}</span>
                   </div>
-                  <Link to="/subscription" className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>Change plan</Link>
+                  <Link to="/subscription" className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{t('Change plan')}</Link>
                 </div>
               ) : !failed && (
                 <div style={row}>
-                  <span style={{ flex: 1, fontSize: 14.5, color: MUTED }}>Choose a plan to open the app again.</span>
-                  <Link to="/subscription" className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>See plans</Link>
+                  <span style={{ flex: 1, fontSize: 14.5, color: MUTED }}>{t('Choose a plan to open the app again.')}</span>
+                  <Link to="/subscription" className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{t('See plans')}</Link>
                 </div>
               )}
               {status.entitled && (
                 <div style={{ paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {plan.cancelAtPeriodEnd ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 13.5, color: MUTED }}>Everything stays open until {longDate(plan.currentPeriodEnd)}. Nothing more will be charged.</span>
-                      <button type="button" disabled={busy} onClick={() => toggleCancel(false)} className="bl-line" style={action}>Keep my plan</button>
+                      <span style={{ fontSize: 13.5, color: MUTED }}>{t('Everything stays open until {date}. Nothing more will be charged.', { date: longDate(plan.currentPeriodEnd) })}</span>
+                      <button type="button" disabled={busy} onClick={() => toggleCancel(false)} className="bl-line" style={action}>{t('Keep my plan')}</button>
                     </div>
                   ) : confirmCancel ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'om-fade .25s ease both' }}>
-                      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.75)' }}>Your plan{status.profiles.extra ? ' and extra profiles' : ''} will stop renewing. You keep access until {longDate(plan.currentPeriodEnd)}{plan.trial ? ', and the trial will not turn into a paid plan' : ''}.</p>
+                      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.75)' }}>{t(status.profiles.extra ? (plan.trial ? 'Your plan and extra profiles will stop renewing. You keep access until {date}, and the trial will not turn into a paid plan.' : 'Your plan and extra profiles will stop renewing. You keep access until {date}.') : (plan.trial ? 'Your plan will stop renewing. You keep access until {date}, and the trial will not turn into a paid plan.' : 'Your plan will stop renewing. You keep access until {date}.'), { date: longDate(plan.currentPeriodEnd) })}</p>
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <button type="button" disabled={busy} onClick={() => toggleCancel(true)} style={{ ...action, borderColor: 'rgba(196,106,90,.7)', color: RED }}>{busy ? 'Cancelling' : 'Cancel renewal'}</button>
-                        <button type="button" onClick={() => setConfirmCancel(false)} style={{ ...action, border: 'none', color: MUTED }}>Never mind</button>
+                        <button type="button" disabled={busy} onClick={() => toggleCancel(true)} style={{ ...action, borderColor: 'rgba(196,106,90,.7)', color: RED }}>{busy ? t('Cancelling') : t('Cancel renewal')}</button>
+                        <button type="button" onClick={() => setConfirmCancel(false)} style={{ ...action, border: 'none', color: MUTED }}>{t('Never mind')}</button>
                       </div>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => setConfirmCancel(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.45)' }}>Cancel plan</button>
+                    <button type="button" onClick={() => setConfirmCancel(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.45)' }}>{t('Cancel plan')}</button>
                   )}
                 </div>
               )}
-            </section>
+            </Card>
 
             {/* --------------------------------------------------- minutes */}
-            <section style={section(0.1)}>
-              <div style={head}><h2 style={h2}>Astrologer minutes</h2><span style={mono10}>{mins(status.minutes.total)} min left</span></div>
+            <Card id="astrologer" n="02" title={t('AI astrologer')} delay={0.1} status={<span style={mono10}>{t('{n} min left', { n: mins(status.minutes.total) })}</span>}>
               <div style={{ ...row, flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14.5 }}>
-                  <span>From your plan</span><span style={{ fontFamily: MONO }}>{mins(status.minutes.plan)} of {mins(allowance)} min</span>
+                  <span>{t('From your plan')}</span><span style={{ fontFamily: MONO }}>{t('{n} of {total} min', { n: mins(status.minutes.plan), total: mins(allowance) })}</span>
                 </div>
                 <div aria-hidden="true" style={{ height: 3, background: 'rgba(244,236,220,.14)' }}>
                   <div style={{ height: '100%', width: `${allowance ? Math.min(100, (status.minutes.plan / allowance) * 100) : 0}%`, background: GOLD, transition: 'width .4s ease' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14.5 }}>
-                  <span>Top-ups</span><span style={{ fontFamily: MONO }}>{mins(status.minutes.topup)} min</span>
+                  <span>{t('Top-ups')}</span><span style={{ fontFamily: MONO }}>{mins(status.minutes.topup)} min</span>
                 </div>
-                <span style={mono10}>Plan minutes reset at each renewal and are used first. Top-ups never expire.</span>
+                <span style={mono10}>{t('Plan minutes reset at each renewal and are used first. Top-ups never expire.')}</span>
               </div>
               {status.entitled && (
-                <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', paddingTop: 14 }}>
-                  {catalog.minutePacks.map(p => {
-                    const n = qty[p.id] || 1;
-                    const step = d => setQty(q => ({ ...q, [p.id]: Math.min(catalog.maxPackQuantity, Math.max(1, n + d)) }));
-                    return (
-                      <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 14px 12px', border: '1px solid rgba(244,236,220,.22)' }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                          <span style={{ fontFamily: SERIF, fontSize: 24 }}>{p.minutes} min</span>
-                          <span style={{ fontFamily: MONO, fontSize: 12, color: GOLD }}>{euros(p.amount)}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <button type="button" aria-label={`Fewer ${p.minutes}-minute packs`} onClick={() => step(-1)} style={{ ...action, padding: '4px 10px' }}>−</button>
-                          <span aria-live="polite" style={{ fontFamily: MONO, fontSize: 13, minWidth: 24, textAlign: 'center' }}>{n}</span>
-                          <button type="button" aria-label={`More ${p.minutes}-minute packs`} onClick={() => step(1)} style={{ ...action, padding: '4px 10px' }}>+</button>
-                          <Link to={`/checkout?item=minutes&pack=${p.id}&qty=${n}`} className="bl-line" style={{ ...action, marginLeft: 'auto', borderBottom: '1px solid rgba(244,236,220,.3)' }}>Buy {euros(p.amount * n)}</Link>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 16 }}>
+                  <span style={{ ...mono10, textTransform: 'uppercase', letterSpacing: '.14em' }}>{t('Top up')}</span>
+                  {/* three equal tiles: they never wrap two-and-one on a phone */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }}>
+                    {catalog.minutePacks.map(p => (
+                      <Link key={p.id} to={`/checkout?item=minutes&pack=${p.id}&qty=1`} className="bl-line" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '12px 6px 10px', border: '1px solid rgba(180,147,63,.45)', background: 'rgba(180,147,63,.06)', color: INK, borderBottom: '1px solid rgba(180,147,63,.45)', textAlign: 'center' }}>
+                        <span style={{ fontFamily: SERIF, fontSize: 28, lineHeight: 1 }}>+{p.minutes}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>min</span>
+                        <span style={{ fontFamily: MONO, fontSize: 12, color: GOLD, marginTop: 4 }}>{euros(p.amount)}</span>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
               )}
-            </section>
+            </Card>
 
             {/* -------------------------------------------------- profiles */}
             <ProfilesSection status={status} catalog={catalog} people={people} />
 
-            {/* ----------------------------------------------- payment card */}
+            {/* ----------------------------------- payment details, not a product */}
+            <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: SAGE, paddingTop: 10 }}>{t('Payment details')}</span>
             <section style={section(0.2)}>
-              <div style={head}><h2 style={h2}>Payment method</h2></div>
+              <div style={head}><h2 style={h2}>{t('Payment method')}</h2></div>
               <div style={row}>
-                <span style={{ flex: 1, fontSize: 14.5 }}>{card === undefined ? '…' : card ? `${cap(card.brand)} ending ${card.last4} · expires ${String(card.expMonth).padStart(2, '0')}/${card.expYear}` : 'No card saved yet'}</span>
-                {plan && <Link to="/checkout?item=card" className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{card ? 'Replace' : 'Add card'}</Link>}
+                <span style={{ flex: 1, fontSize: 14.5 }}>{card === undefined ? '…' : card ? t('{brand} ending {last4} · expires {date}', { brand: cap(card.brand), last4: card.last4, date: `${String(card.expMonth).padStart(2, '0')}/${card.expYear}` }) : t('No card saved yet')}</span>
+                {plan && <Link to="/checkout?item=card" className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{card ? t('Replace') : t('Add card')}</Link>}
               </div>
             </section>
 
             {/* --------------------------------------------------- receipts */}
             <section style={section(0.25)}>
-              <div style={head}><h2 style={h2}>Invoices</h2><span style={mono10}>{invoices ? `${invoices.length} on record` : ''}</span></div>
-              {invoices && invoices.length === 0 && <span style={{ ...row, color: MUTED, fontSize: 14 }}>Nothing yet.</span>}
-              {invoices && invoices.map(inv => (
-                <div key={inv.id} style={row}>
+              <div style={head}><h2 style={h2}>{t('Receipts')}</h2><span style={mono10}>{receipts ? t(receipts.length === 1 ? '{n} payment' : '{n} payments', { n: receipts.length }) : ''}</span></div>
+              {receipts && receipts.length === 0 && <span style={{ ...row, color: MUTED, fontSize: 14 }}>{t('No payments yet.')}</span>}
+              {receipts && receipts.map(r => (
+                <div key={r.id} style={row}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-                    <span style={{ fontSize: 14.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.description || 'Invoice'}</span>
-                    <span style={mono10}>{longDate(inv.created)} · {inv.number || '—'} · {inv.status}</span>
+                    <span style={{ fontSize: 14.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</span>
+                    <span style={mono10}>{longDate(r.created)}{r.refunded ? ` · ${t('refunded')}` : ''}</span>
                   </div>
-                  <span style={{ fontFamily: MONO, fontSize: 13 }}>{euros(inv.total)}</span>
-                  {(inv.pdfUrl || inv.hostedUrl) && <a href={inv.pdfUrl || inv.hostedUrl} target="_blank" rel="noreferrer" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED, borderBottom: 'none' }}>{inv.pdfUrl ? 'PDF' : 'View'}</a>}
+                  <span style={{ fontFamily: MONO, fontSize: 13 }}>{euros(r.amount)}</span>
+                  {/* Stripe's own receipt page for this payment, nothing else */}
+                  {r.receiptUrl && <a href={r.receiptUrl} target="_blank" rel="noreferrer" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: GOLD, borderBottom: 'none', whiteSpace: 'nowrap' }}>{t('Receipt ↗')}</a>}
                 </div>
               ))}
             </section>
@@ -210,7 +218,7 @@ const PROFILE_RULES = [
   'Your own profile comes with every plan. Packs add room for other people.',
   'One pack at a time. Moving up charges the difference for the rest of this month; moving down credits it. Your billing date stays the same.',
   'Saved people stay on your account for good; they cannot be deleted. Switch someone off to hide them. They keep their slot, and you can switch them back on.',
-  `Details are fixed once saved: your own profile can be corrected ${EDIT_LIMITS.primary} times, each saved person once. The portrait and relationship are free to change.`,
+  'Details are fixed once saved: your own profile can be corrected {n} times, each saved person once. The portrait and relationship are free to change.',
   'A pack renews monthly and ends with your plan.'
 ];
 
@@ -226,14 +234,13 @@ function ProfilesSection({ status, catalog, people }) {
   const sub = { fontSize: 12.5, lineHeight: 1.55, color: MUTED, textWrap: 'pretty' };
 
   return (
-    <section style={section(0.15)}>
-      <div style={head}><h2 style={h2}>Profiles</h2><span style={mono10}>{p.used} of {slots} slots used</span></div>
+    <Card id="profiles" n="03" title={t('Profiles')} delay={0.15} status={<span style={mono10}>{t('{used} of {total} slots used', { used: p.used, total: slots })}</span>}>
 
       {/* the pack you pay for */}
       <div style={row}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ fontSize: 14.5 }}>{current ? `${packName(current)} pack · ${euros(current.amount)} a month` : 'No profile pack'}</span>
-          <span style={mono10}>{current ? `Room for ${slots} profiles, your own included` : 'Your own profile is included with your plan'}</span>
+          <span style={{ fontSize: 14.5 }}>{current ? t('{pack} pack · {price} a month', { pack: packName(current), price: euros(current.amount) }) : t('No profile pack')}</span>
+          <span style={mono10}>{current ? t('Room for {n} profiles, your own included', { n: slots }) : t('Your own profile is included with your plan')}</span>
         </div>
       </div>
 
@@ -244,17 +251,17 @@ function ProfilesSection({ status, catalog, people }) {
         ))}
       </div>
       <div style={{ ...row, flexWrap: 'wrap', gap: '4px 18px', ...mono10 }}>
-        <span>Yours · 1</span>
-        <span style={{ color: SAGE }}>Saved, on · {extras.length - off}</span>
-        <span style={{ color: GOLD }}>Switched off · {off}</span>
-        <span>Free · {Math.max(0, slots - p.used)}</span>
-        {own && <span style={{ marginLeft: 'auto' }}>Your details · {editsText(own.editsLeft).toLowerCase()}</span>}
+        <span>{t('Yours · 1')}</span>
+        <span style={{ color: SAGE }}>{t('Saved, on · {n}', { n: extras.length - off })}</span>
+        <span style={{ color: GOLD }}>{t('Switched off · {n}', { n: off })}</span>
+        <span>{t('Free · {n}', { n: Math.max(0, slots - p.used) })}</span>
+        {own && <span style={{ marginLeft: 'auto' }}>{t('Your details · {edits}', { edits: getLang() === 'en' ? editsText(own.editsLeft).toLowerCase() : editsText(own.editsLeft) })}</span>}
       </div>
 
       {failed && (
         <div style={{ ...row, borderLeft: `2px solid ${RED}`, paddingLeft: 12 }}>
-          <span style={{ flex: 1, fontSize: 14 }}>The last payment for your profile pack failed. Pay it to keep your pack.</span>
-          <Link to="/checkout?item=invoice&kind=profiles" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>Pay now</Link>
+          <span style={{ flex: 1, fontSize: 14 }}>{t('The last payment for your profile pack failed. Pay it to keep your pack.')}</span>
+          <Link to="/checkout?item=invoice&kind=profiles" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{t('Pay now')}</Link>
         </div>
       )}
 
@@ -267,20 +274,39 @@ function ProfilesSection({ status, catalog, people }) {
         return (
           <div key={pack.id} style={row}>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 14.5 }}>{packName(pack)} · {euros(pack.amount)} a month</span>
-              <span style={mono10}>{mine ? 'Your pack' : !fits ? `Holds ${p.included + pack.extra} profiles; you have ${p.used}` : current ? `${up ? 'Charged' : 'Credited'} the difference today, pro rata` : `Room for ${p.included + pack.extra} profiles`}</span>
+              <span style={{ fontSize: 14.5 }}>{t('{pack} · {price} a month', { pack: packName(pack), price: euros(pack.amount) })}</span>
+              <span style={mono10}>{mine ? t('Your pack') : !fits ? t('Holds {n} profiles; you have {used}', { n: p.included + pack.extra, used: p.used }) : current ? t(up ? 'Charged the difference today, pro rata' : 'Credited the difference today, pro rata') : t('Room for {n} profiles', { n: p.included + pack.extra })}</span>
             </div>
-            {mine ? <span style={{ ...mono10, color: SAGE }}>Current</span>
-              : status.entitled && fits && <Link to={`/checkout?item=profiles&pack=${pack.id}`} className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{!current ? 'Choose' : up ? 'Upgrade' : 'Downgrade'}</Link>}
+            {mine ? <span style={{ ...mono10, color: SAGE }}>{t('Current')}</span>
+              : status.entitled && fits && <Link to={`/checkout?item=profiles&pack=${pack.id}`} className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{!current ? t('Choose') : up ? t('Upgrade') : t('Downgrade')}</Link>}
           </div>
         );
       })}
 
-      {/* the rules */}
-      <ul style={{ listStyle: 'none', margin: 0, padding: '14px 0 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {PROFILE_RULES.map(r => <li key={r} style={{ display: 'flex', gap: 10, ...sub }}><span style={{ fontFamily: MONO, color: SAGE }}>·</span><span>{r}</span></li>)}
-      </ul>
-      <Link to="/account" style={{ alignSelf: 'flex-start', marginTop: 12, ...mono10, textTransform: 'uppercase', letterSpacing: '.12em', borderBottom: '1px solid rgba(244,236,220,.3)' }}>Manage saved people</Link>
+      {/* the rules, folded away until asked for */}
+      <details style={{ paddingTop: 14 }}>
+        <summary style={{ cursor: 'pointer', ...mono10, textTransform: 'uppercase', letterSpacing: '.12em' }}>{t('How profile packs work')}</summary>
+        <ul style={{ listStyle: 'none', margin: 0, padding: '10px 0 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {PROFILE_RULES.map(r => <li key={r} style={{ display: 'flex', gap: 10, ...sub }}><span style={{ fontFamily: MONO, color: SAGE }}>·</span><span>{t(r, { n: EDIT_LIMITS.primary })}</span></li>)}
+        </ul>
+      </details>
+      <Link to="/account" style={{ alignSelf: 'flex-start', marginTop: 12, ...mono10, textTransform: 'uppercase', letterSpacing: '.12em', borderBottom: '1px solid rgba(244,236,220,.3)' }}>{t('Manage saved people')}</Link>
+    </Card>
+  );
+}
+
+/* One product, one box: its number and name, its status on the right, then the detail. */
+function Card({ id, n, title, status, delay, children }) {
+  return (
+    <section id={id} style={{ ...section(delay), scrollMarginTop: 16, border: '1px solid rgba(244,236,220,.18)', background: 'rgba(17,23,37,.55)', padding: '18px 20px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', paddingBottom: 12, borderBottom: `1px solid ${INK}` }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: GOLD }}>{n}</span>
+          <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 26, lineHeight: 1.1 }}>{title}</h2>
+        </div>
+        {status}
+      </div>
+      {children}
     </section>
   );
 }

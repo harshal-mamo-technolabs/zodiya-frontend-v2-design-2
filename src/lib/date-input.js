@@ -1,6 +1,8 @@
 /* Shared by the birth-details form and the numerology page: a DD / MM / YYYY
    field that formats as you type and validates against the real calendar. */
 
+import { locale, t } from '../i18n/index.js';
+
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export const digits = v => String(v || '').replace(/\D/g, '');
@@ -47,10 +49,10 @@ export function checkDate(raw) {
   if (d.length < 8) return { iso: null, error: null };
   const day = +d.slice(0, 2), mon = +d.slice(2, 4), year = +d.slice(4, 8);
   const thisYear = new Date().getFullYear();
-  if (mon < 1 || mon > 12) return { iso: null, error: 'Month must be 01 to 12' };
-  if (year < 1900 || year > thisYear) return { iso: null, error: `Year must be 1900 to ${thisYear}` };
+  if (mon < 1 || mon > 12) return { iso: null, error: t('Month must be 01 to 12') };
+  if (year < 1900 || year > thisYear) return { iso: null, error: t('Year must be 1900 to {year}', { year: thisYear }) };
   const len = new Date(year, mon, 0).getDate();
-  if (day < 1 || day > len) return { iso: null, error: `${MONTHS[mon - 1]} ${year} has ${len} days` };
+  if (day < 1 || day > len) return { iso: null, error: t('{month} has {n} days', { month: new Date(year, mon - 1, 1).toLocaleDateString(locale(), { month: 'short', year: 'numeric' }), n: len }) };
   return { iso: `${year}-${d.slice(2, 4)}-${d.slice(0, 2)}`, error: null };
 }
 
@@ -72,8 +74,8 @@ export function checkTime(raw) {
   const [H, M] = splitTime(raw);
   if (!H || M.length < 2) return { hm: null, error: null };
   const hh = +H, mm = +M;
-  if (hh > 23) return { hm: null, error: 'Hour must be 00–23' };
-  if (mm > 59) return { hm: null, error: 'Minute must be 00–59' };
+  if (hh > 23) return { hm: null, error: t('Hour must be 00–23') };
+  if (mm > 59) return { hm: null, error: t('Minute must be 00–59') };
   return { hm: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, error: null };
 }
 

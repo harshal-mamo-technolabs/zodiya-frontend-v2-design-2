@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import { getStats } from '../lib/api.js';
+import { useSales } from '../lib/billing.js';
+import LanguageSwitch from '../components/LanguageSwitch.jsx';
+import { locale, t } from '../i18n/index.js';
 
 /* A port of Landing Page.dc.html: the public front door. Numbers on it are real. */
 
@@ -21,7 +24,10 @@ const OFFERINGS = [
   ['III', 'Transits', 'What the planets are doing to your chart this month, and why it feels that way.', '/transits'],
   ['IV', 'Daily horoscope', 'A short note each morning, written for your chart, not just your sign.', '/daily-horoscope'],
   ['V', 'Tarot', 'Three-card draws with readings that follow the question you asked.', '/tarot'],
-  ['VI', 'Numerology', 'Life path, expression and destiny numbers from your name and date.', '/numerology']
+  ['VI', 'Numerology', 'Life path, expression and destiny numbers from your name and date.', '/numerology'],
+  ['VII', 'Astrocartography', 'Your chart cast across a 3D globe: where each planet rose, set or stood overhead, and what a city would bring you.', '/astrocartography', true],
+  ['VIII', 'Palm reading', 'Photograph your palm. AI reads your heart, head, life and fate lines, writes a full report and highlights the lines on your photo.', '/palm-reading', true],
+  ['IX', 'AI astrologer', 'Twelve voice astrologers who know your chart. Ask anything out loud, in English or German.', '/choose-astrologer', true]
 ];
 
 /* The sample wheel is the design's own: a Lisbon birth on 14 March 1994, equal houses. */
@@ -83,10 +89,11 @@ function SampleWheel() {
     n++;
   }
   kids.push(<circle key="cdot" cx={C} cy={C} r={1.6} fill={INK} style={anim('om-fade', .3, 1.3)} />);
-  return <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }} role="img" aria-label="Sample natal chart wheel">{kids}</svg>;
+  return <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }} role="img" aria-label={t('Sample natal chart wheel')}>{kids}</svg>;
 }
 
 export default function Landing() {
+  const sales = useSales();
   const [charts, setCharts] = useState(null);
   useEffect(() => { getStats().then(s => setCharts(s.charts)).catch(() => {}); }, []);
 
@@ -96,54 +103,60 @@ export default function Landing() {
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}><Starfield /></div>
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.42)' }} />
 
-      <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+      <header style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '10px 16px', padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 12px' }}>
           <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 22, letterSpacing: '.14em', textTransform: 'uppercase' }}>AstroMeridian</span>
-          <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', color: MUTED, textTransform: 'uppercase' }}>Natal Atlas</span>
+          <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', color: MUTED, textTransform: 'uppercase' }}>{t('Natal Atlas')}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Link to="/login" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)', paddingBottom: 2 }}>Sign in</Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginLeft: 'auto' }}>
+          <LanguageSwitch />
+          <Link to="/login" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)', paddingBottom: 2, whiteSpace: 'nowrap' }}>{t('Sign in')}</Link>
         </div>
       </header>
 
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto' }}>
 
         <section style={{ padding: '44px 24px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 20 }}>
+          {sales && (
           <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: COP, display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ display: 'block', width: 28, height: 1, background: COP }} />
-            <span>Plans from €10 · Try 3 days for €3</span>
+            <span>{t('Plans from €10 · Try 3 days for €3')}</span>
             <span style={{ display: 'block', width: 28, height: 1, background: COP }} />
           </div>
-          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(38px,9vw,64px)', lineHeight: 1.04, letterSpacing: '-.01em', maxWidth: 680, textWrap: 'balance' }}>You were born under a sky no one else has ever seen.</h1>
-          <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, color: MUTED, maxWidth: 460, textWrap: 'pretty' }}>Enter your birth date, time and place. We plot the heavens exactly as they stood in that minute, then explain what they mean, in plain English.</p>
+          )}
+          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(38px,9vw,64px)', lineHeight: 1.04, letterSpacing: '-.01em', maxWidth: 680, textWrap: 'balance' }}>{t('You were born under a sky no one else has ever seen.')}</h1>
+          <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, color: MUTED, maxWidth: 460, textWrap: 'pretty' }}>{t('Enter your birth date, time and place. We plot the heavens exactly as they stood in that minute, then explain what they mean, in plain English.')}</p>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, width: '100%', maxWidth: 360, marginTop: 4 }}>
             <Link to="/signup" className="ld-cta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 54, padding: '0 20px 0 24px', background: INK, color: NAVY, border: 'none', borderBottom: 'none', borderRadius: 2, fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 16, letterSpacing: '.01em' }}>
-              <span>Get your birth chart</span>
+              <span>{t('Get your birth chart')}</span>
               <span style={{ fontFamily: MONO, fontSize: 14, opacity: .8 }}>→</span>
             </Link>
-            <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.08em', color: MUTED }}>Takes about a minute</span>
+            <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.08em', color: MUTED }}>{t('Takes about a minute')}</span>
           </div>
         </section>
 
         <section style={{ padding: '28px 16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
           <div style={{ width: '100%', maxWidth: 560, aspectRatio: '1 / 1', position: 'relative' }}><SampleWheel /></div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 18px', fontFamily: MONO, fontSize: 11, letterSpacing: '.06em', color: MUTED, textAlign: 'center' }}>
-            <span>14 MAR 1994</span><span>06:42 UTC</span><span>38°43′N · 9°08′W</span>
-            <span style={{ width: '100%', color: COP, textTransform: 'uppercase', letterSpacing: '.14em', fontSize: 10, marginTop: 2 }}>Sample chart · Lisbon · Equal houses</span>
+            <span>{t('14 MAR 1994')}</span><span>06:42 UTC</span><span>38°43′N · 9°08′W</span>
+            <span style={{ width: '100%', color: COP, textTransform: 'uppercase', letterSpacing: '.14em', fontSize: 10, marginTop: 2 }}>{t('Sample chart · Lisbon · Equal houses')}</span>
           </div>
         </section>
 
         <section style={{ padding: '56px 24px 24px', display: 'flex', flexDirection: 'column', gap: 22 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, borderBottom: `1px solid ${INK}`, paddingBottom: 12 }}>
-            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 30, lineHeight: 1.1 }}>Six instruments</h2>
-            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: MUTED, whiteSpace: 'nowrap' }}>Plate I – VI</span>
+            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 30, lineHeight: 1.1 }}>{t('Nine instruments')}</h2>
+            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: MUTED, whiteSpace: 'nowrap' }}>{t('Plate I – IX')}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', background: NAVY, borderTop: '1px solid rgba(244,236,220,.25)', borderLeft: '1px solid rgba(244,236,220,.25)' }}>
-            {OFFERINGS.map(([n, title, desc, to]) => (
+            {OFFERINGS.map(([n, title, desc, to, fresh]) => (
               <Link key={n} to={to} className="ld-cell" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 16px 20px', background: NAVY, border: 'none', borderRight: '1px solid rgba(244,236,220,.25)', borderBottom: '1px solid rgba(244,236,220,.25)', minHeight: 150 }}>
-                <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', color: COP }}>{n}</span>
-                <span style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 24, lineHeight: 1.05 }}>{title}</span>
-                <span style={{ fontSize: 13, lineHeight: 1.45, color: MUTED, textWrap: 'pretty' }}>{desc}</span>
+                <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', color: COP }}>
+                  <span>{n}</span>
+                  {fresh && <span style={{ padding: '2px 6px', border: `1px solid ${GOLD}`, color: GOLD, fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase' }}>{t('New')}</span>}
+                </span>
+                <span style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 24, lineHeight: 1.05 }}>{t(title)}</span>
+                <span style={{ fontSize: 13, lineHeight: 1.45, color: MUTED, textWrap: 'pretty' }}>{t(desc)}</span>
               </Link>
             ))}
           </div>
@@ -153,22 +166,22 @@ export default function Landing() {
           <div style={{ border: '1px solid rgba(244,236,220,.3)', background: 'rgba(244,236,220,.08)', padding: '26px 22px 24px', display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 720, margin: '0 auto', position: 'relative' }}>
             <div style={{ position: 'absolute', top: -1, left: 22, right: 22, height: 1, background: GOLD }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: MUTED }}>
-              <span>From a sample reading</span>
-              <span style={{ color: COP }}>Moon · 08°14′ Scorpio · Eighth house</span>
+              <span>{t('From a sample reading')}</span>
+              <span style={{ color: COP }}>{t('Moon · 08°14′ Scorpio · Eighth house')}</span>
             </div>
-            <p style={{ margin: 0, fontFamily: SERIF, fontSize: 'clamp(21px,5.2vw,27px)', lineHeight: 1.35, fontWeight: 400, textWrap: 'pretty' }}>Your Moon sits low in the chart, in the house of things kept private. You don't feel emotions so much as absorb them: slowly, completely, and often before you have words for what has happened. People mistake the stillness for calm. It isn't calm; it's depth. What you need most from the people closest to you is not reassurance but honesty, because you can always tell when something is being withheld, and the withholding hurts more than the truth would.</p>
+            <p style={{ margin: 0, fontFamily: SERIF, fontSize: 'clamp(21px,5.2vw,27px)', lineHeight: 1.35, fontWeight: 400, textWrap: 'pretty' }}>{t("Your Moon sits low in the chart, in the house of things kept private. You don't feel emotions so much as absorb them: slowly, completely, and often before you have words for what has happened. People mistake the stillness for calm. It isn't calm; it's depth. What you need most from the people closest to you is not reassurance but honesty, because you can always tell when something is being withheld, and the withholding hurts more than the truth would.")}</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, borderTop: '1px solid rgba(244,236,220,.2)', paddingTop: 14, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, color: MUTED }}>Every reading is written like this: specific to your chart, in full sentences.</span>
-              <Link to="/signup" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Draw your own →</Link>
+              <span style={{ fontSize: 13, color: MUTED }}>{t('Every reading is written like this: specific to your chart, in full sentences.')}</span>
+              <Link to="/signup" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{t('Draw your own →')}</Link>
             </div>
           </div>
         </section>
 
         <section style={{ padding: '40px 24px 56px', display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 720, margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 10, alignItems: 'center', fontFamily: MONO, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED, textAlign: 'center', flexWrap: 'wrap' }}>
-            <span>{charts == null ? ' ' : `${charts.toLocaleString('en-GB')} ${charts === 1 ? 'chart' : 'charts'} drawn so far`}</span>
+            <span>{charts == null ? ' ' : t(charts === 1 ? '{n} chart drawn so far' : '{n} charts drawn so far', { n: charts.toLocaleString(locale()) })}</span>
             <span style={{ color: GOLD }}>·</span>
-            <span>Positions to the arc-minute</span>
+            <span>{t('Positions to the arc-minute')}</span>
           </div>
         </section>
       </main>
@@ -178,17 +191,17 @@ export default function Landing() {
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '24px 40px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 300 }}>
               <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 20, letterSpacing: '.14em', textTransform: 'uppercase' }}>AstroMeridian</span>
-              <span style={{ fontSize: 13, lineHeight: 1.5, color: 'rgba(28,37,56,.7)' }}>Planetary positions computed to the arc-minute. Written by people, checked against the ephemeris.</span>
+              <span style={{ fontSize: 13, lineHeight: 1.5, color: 'rgba(28,37,56,.7)' }}>{t('Planetary positions computed to the arc-minute. Written by people, checked against the ephemeris.')}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(120px,auto))', gap: '10px 40px', fontSize: 13 }}>
-              {[['Birth chart', '/natal-chart'], ['Synastry', '/synastry'], ['Transits', '/transits'], ['Daily horoscope', '/daily-horoscope'], ['Tarot', '/tarot'], ['Numerology', '/numerology'], ['Pricing', '/subscription'], ['Sign in', '/login']].map(([label, to]) => (
-                <Link key={label} to={to} style={{ color: 'rgba(28,37,56,.85)', borderBottom: 'none' }}>{label}</Link>
+              {[['Birth chart', '/natal-chart'], ['Synastry', '/synastry'], ['Transits', '/transits'], ['Daily horoscope', '/daily-horoscope'], ['Tarot', '/tarot'], ['Numerology', '/numerology'], ['Astrocartography', '/astrocartography'], ['Palm reading', '/palm-reading'], ['Pricing', '/subscription'], ['Sign in', '/login']].map(([label, to]) => (
+                <Link key={label} to={to} style={{ color: 'rgba(28,37,56,.85)', borderBottom: 'none' }}>{t(label)}</Link>
               ))}
             </div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '8px 20px', borderTop: '1px solid rgba(28,37,56,.2)', paddingTop: 16, fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(28,37,56,.6)' }}>
             <span>© MMXXVI AstroMeridian</span>
-            <span>For reflection, not prediction</span>
+            <span>{t('For reflection, not prediction')}</span>
           </div>
         </div>
       </footer>

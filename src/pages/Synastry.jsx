@@ -6,6 +6,7 @@ import { getSynastry, listProfiles } from '../lib/api.js';
 import { readActive } from '../lib/active-profile.js';
 import { BODY_GLYPH, SIGN_GLYPH, SIGNS } from '../lib/chart-view.js';
 import { avatarImage } from '../lib/assets.js';
+import { t } from '../i18n/index.js';
 
 /* A port of Synastry.dc.html: pick two saved profiles, then read one sky laid over the other. */
 
@@ -83,7 +84,7 @@ function Wheel({ a, b, contacts, speed = 1 }) {
     kids.push(<circle key={'cj' + n} cx={p[0]} cy={p[1]} r={3.5} fill="none" stroke={INK} strokeWidth={.9} style={anim('om-fade', .4, 1.4 + n * .05)} />);
   });
   kids.push(<circle key="cd" cx={C} cy={C} r={1.6} fill={INK} style={anim('om-fade', .3, 1.3)} />);
-  return <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }} role="img" aria-label="Bi-wheel synastry chart">{kids}</svg>;
+  return <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }} role="img" aria-label={t('Bi-wheel synastry chart')}>{kids}</svg>;
 }
 
 /* ------------------------------------------------------- the pairing preview */
@@ -109,12 +110,12 @@ function Hero({ pa, pb }) {
         ) : (
           <text x={pos[0]} y={pos[1] - 2} textAnchor="middle" dominantBaseline="central" fontSize={22} fontFamily={SERIF} fill={p ? INK : 'rgba(244,236,220,.35)'}>{p ? p.firstName.trim().charAt(0).toUpperCase() : '?'}</text>
         )}
-        {p && <text x={pos[0]} y={pos[1] + (p.avatar ? 58 : 24)} textAnchor="middle" fontSize={8.5} letterSpacing={1} fontFamily={MONO} fill={color}>{p.zodiacSign.toUpperCase()}</text>}
+        {p && <text x={pos[0]} y={pos[1] + (p.avatar ? 58 : 24)} textAnchor="middle" fontSize={8.5} letterSpacing={1} fontFamily={MONO} fill={color}>{t(cap(p.zodiacSign)).toUpperCase()}</text>}
       </g>
     );
   };
   return (
-    <svg viewBox="0 0 400 400" width="100%" height="100%" role="img" aria-label="Synastry pairing preview" style={{ display: 'block', overflow: 'visible' }}>
+    <svg viewBox="0 0 400 400" width="100%" height="100%" role="img" aria-label={t('Synastry pairing preview')} style={{ display: 'block', overflow: 'visible' }}>
       {[178, 150].map((r, i) => <circle key={'r' + r} cx={C} cy={C} r={r} fill="none" stroke={LIGHT} strokeWidth={i === 0 ? .7 : .5} />)}
       <g style={{ transformOrigin: `${C}px ${C}px`, animation: 'om-turn 90s linear infinite' }}>{ticks}</g>
       <path d={`M${RA[0]} ${RA[1]} Q${C} ${midY} ${RB[0]} ${RB[1]}`} fill="none" stroke={both ? GOLD : LIGHT} strokeWidth={both ? 1.6 : .8} pathLength={1} strokeDasharray={1} style={{ animation: 'om-draw 1.1s cubic-bezier(.3,0,.2,1) both', filter: both ? 'drop-shadow(0 0 6px rgba(180,147,63,.65))' : 'none', transition: 'stroke .4s ease' }} />
@@ -132,10 +133,10 @@ function Gauge({ value }) {
     const x = 6 + (W - 12) * i / 20, maj = i % 5 === 0;
     ticks.push(<line key={'t' + i} x1={x} y1={y} x2={x} y2={y + (maj ? 10 : 5)} stroke={INK} strokeWidth={maj ? .9 : .5} />);
   }
-  ['Strained', 'Workable', 'Warm', 'Rare'].forEach((w, i) => ticks.push(<text key={'l' + i} x={6 + (W - 12) * (i * 5 + 2.5) / 20} y={y + 22} fontSize={7.5} fill={MUTED} fontFamily={MONO} textAnchor="middle" letterSpacing={.8}>{w.toUpperCase()}</text>));
+  ['Strained', 'Workable', 'Warm', 'Rare'].forEach((w, i) => ticks.push(<text key={'l' + i} x={6 + (W - 12) * (i * 5 + 2.5) / 20} y={y + 22} fontSize={7.5} fill={MUTED} fontFamily={MONO} textAnchor="middle" letterSpacing={.8}>{t(w).toUpperCase()}</text>));
   const x = 6 + (W - 12) * value;
   return (
-    <svg viewBox={`0 0 ${W} 64`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }} aria-label="Overall compatibility gauge">
+    <svg viewBox={`0 0 ${W} 64`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }} aria-label={t('Overall compatibility gauge')}>
       <line x1={6} y1={y} x2={W - 6} y2={y} stroke={INK} strokeWidth={1} pathLength={1} strokeDasharray={1} style={{ animation: 'om-draw .7s cubic-bezier(.3,0,.2,1) both' }} />
       <g style={{ animation: 'om-fade .4s ease .3s both' }}>{ticks}</g>
       <g style={{ animation: 'om-fade .5s ease .7s both' }}>
@@ -216,7 +217,7 @@ export default function Synastry() {
           {p.avatar ? <img src={avatarImage(p.avatar)} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : p.firstName.trim().charAt(0).toUpperCase()}
         </span>
         <span style={{ fontSize: 12, color: selected ? INK : MUTED, textAlign: 'center', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 84 }}>{p.firstName} {p.lastName}</span>
-        <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.5)' }}>{cap(p.zodiacSign)}</span>
+        <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.5)' }}>{t(cap(p.zodiacSign))}</span>
       </button>
     );
   };
@@ -235,7 +236,7 @@ export default function Synastry() {
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED, whiteSpace: 'nowrap' }}>{stage === 'form' ? 'Synastry · entry' : 'Synastry · plate'}</span>
+          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED, whiteSpace: 'nowrap' }}>{t(stage === 'form' ? 'Synastry · entry' : 'Synastry · plate')}</span>
           <NavMenu current="Synastry" />
         </div>
       </header>
@@ -245,9 +246,9 @@ export default function Synastry() {
       {stage === 'form' && (
         <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '32px 24px 56px', display: 'flex', flexDirection: 'column', gap: 32 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 560 }}>
-            <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: COP }}>Comparative plate</span>
-            <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(32px,8vw,46px)', lineHeight: 1.06, textWrap: 'balance' }}>Two skies, laid one over the other.</h1>
-            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: MUTED, textWrap: 'pretty' }}>Choose two saved profiles. Their charts are already on file. Nothing to type.</p>
+            <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: COP }}>{t('Comparative plate')}</span>
+            <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(32px,8vw,46px)', lineHeight: 1.06, textWrap: 'balance' }}>{t('Two skies, laid one over the other.')}</h1>
+            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: MUTED, textWrap: 'pretty' }}>{t('Choose two saved profiles. Their charts are already on file. Nothing to type.')}</p>
           </div>
 
           <div style={{ width: '100%', maxWidth: 460, aspectRatio: '1 / 1', margin: '0 auto' }}><Hero pa={pa} pb={pb} /></div>
@@ -255,23 +256,23 @@ export default function Synastry() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '30px 44px' }}>
             {slots.map(slot => (
               <div key={slot.label} style={{ display: 'flex', flexDirection: 'column', gap: 14, borderTop: `2px solid ${slot.rule}`, paddingTop: 14 }}>
-                <span style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 500 }}>{slot.label}</span>
+                <span style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 500 }}>{t(slot.label)}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>{profiles.map(slot.render)}</div>
               </div>
             ))}
           </div>
 
           {profiles.length > 0 && profiles.length < 2 && (
-            <p style={{ margin: 0, fontSize: 13.5, color: MUTED }}>Add another profile to run a comparison. <button type="button" onClick={() => setAdding(true)} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: INK, font: 'inherit', borderBottom: '1px solid rgba(244,236,220,.35)' }}>Add a profile</button></p>
+            <p style={{ margin: 0, fontSize: 13.5, color: MUTED }}>{t('Add another profile to run a comparison.')} <button type="button" onClick={() => setAdding(true)} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: INK, font: 'inherit', borderBottom: '1px solid rgba(244,236,220,.35)' }}>{t('Add a profile')}</button></p>
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 420 }}>
             {error && <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14, lineHeight: 1.45 }}>{error}</div>}
             <button type="button" onClick={submit} disabled={!ready || busy} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56, padding: '0 20px 0 24px', background: ready && !busy ? INK : 'rgba(244,236,220,.35)', color: NAVY, border: 'none', borderRadius: 2, fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 16, cursor: ready && !busy ? 'pointer' : 'not-allowed' }}>
-              <span>{busy ? 'Comparing…' : 'Compare the charts'}</span>
+              <span>{busy ? t('Comparing…') : t('Compare the charts')}</span>
               <span style={{ fontFamily: MONO, fontSize: 14, opacity: .8 }}>→</span>
             </button>
-            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED }}>{ready ? 'Both profiles chosen' : 'Choose two different profiles to compare'}</span>
+            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED }}>{ready ? t('Both profiles chosen') : t('Choose two different profiles to compare')}</span>
           </div>
         </main>
       )}
@@ -284,17 +285,17 @@ export default function Synastry() {
 
           <section style={{ padding: '14px 24px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 9, height: 9, border: `1px solid ${INK}`, background: INK, display: 'block' }} />{data.a.firstName} · inner</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 9, height: 9, border: `1px solid ${INK}`, background: COP, display: 'block' }} />{data.b.firstName} · outer</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 9, height: 9, border: `1px solid ${INK}`, background: INK, display: 'block' }} />{t('{name} · inner', { name: data.a.firstName })}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 9, height: 9, border: `1px solid ${INK}`, background: COP, display: 'block' }} />{t('{name} · outer', { name: data.b.firstName })}</span>
             </div>
             <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(28px,7vw,40px)', lineHeight: 1.12, textWrap: 'balance' }}>{data.headline}</h1>
-            <button type="button" onClick={() => setStage('form')} className="syn-back" style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)' }}>Edit either entry</button>
+            <button type="button" onClick={() => setStage('form')} className="syn-back" style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)' }}>{t('Edit either entry')}</button>
           </section>
 
           <section style={{ padding: '30px 24px 0' }}>
             <div style={{ border: `1px solid ${INK}`, background: 'rgba(244,236,220,.08)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '20px 20px 18px', borderRight: '1px solid rgba(244,236,220,.25)', borderBottom: '1px solid rgba(244,236,220,.25)' }}>
-                <span style={mono10}>Overall reading</span>
+                <span style={mono10}>{t('Overall reading')}</span>
                 <div style={{ height: 64 }}><Gauge value={data.score.value} /></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
                   <span style={{ fontFamily: SERIF, fontSize: 26, lineHeight: 1.1 }}>{data.score.word}</span>
@@ -303,11 +304,11 @@ export default function Synastry() {
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED, textWrap: 'pretty' }}>{data.score.note}</p>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', padding: '16px 20px 12px', borderBottom: '1px solid rgba(244,236,220,.25)' }}>
-                <span style={{ ...mono10, paddingBottom: 8 }}>Strongest cross-aspects</span>
-                {data.top.map(t => (
-                  <div key={`${t.a}-${t.type}-${t.b}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'baseline', padding: '8px 0', borderTop: '1px solid rgba(244,236,220,.18)' }}>
-                    <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 14 }}><span style={{ fontFamily: SYM, fontSize: 14, letterSpacing: '.04em' }}>{glyph(t.a)} {t.glyph} {glyph(t.b)}</span><span>{t.text}</span></span>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: KIND_COLOR[t.kind], whiteSpace: 'nowrap' }}>{t.orbText}</span>
+                <span style={{ ...mono10, paddingBottom: 8 }}>{t('Strongest cross-aspects')}</span>
+                {data.top.map(x => (
+                  <div key={`${x.a}-${x.type}-${x.b}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'baseline', padding: '8px 0', borderTop: '1px solid rgba(244,236,220,.18)' }}>
+                    <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 14 }}><span style={{ fontFamily: SYM, fontSize: 14, letterSpacing: '.04em' }}>{glyph(x.a)} {x.glyph} {glyph(x.b)}</span><span>{x.text}</span></span>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: KIND_COLOR[x.kind], whiteSpace: 'nowrap' }}>{x.orbText}</span>
                   </div>
                 ))}
               </div>
@@ -316,8 +317,8 @@ export default function Synastry() {
 
           <section style={{ padding: '34px 24px 0', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, borderBottom: `1px solid ${INK}`, paddingBottom: 10 }}>
-              <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 26 }}>The comparison</h2>
-              <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: MUTED }}>Four sections</span>
+              <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 26 }}>{t('The comparison')}</h2>
+              <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: MUTED }}>{t('Four sections')}</span>
             </div>
             {data.sections.map(s => (
               <div key={s.key} style={{ borderBottom: '1px solid rgba(244,236,220,.25)' }}>

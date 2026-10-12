@@ -7,6 +7,7 @@ import { listProfiles } from '../lib/api.js';
 import { readActive } from '../lib/active-profile.js';
 import { EDIT_LIMITS, editsText } from '../lib/billing.js';
 import { avatarImage } from '../lib/assets.js';
+import { t } from '../i18n/index.js';
 
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',Georgia,serif";
@@ -67,33 +68,33 @@ export default function BirthDetails() {
 
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '32px 24px 48px', display: 'flex', flexDirection: 'column', gap: 26 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: '#5F8B7A' }}>The logbook</span>
-          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(32px,8vw,44px)', lineHeight: 1.08, textWrap: 'balance' }}>{profile ? `${profile.firstName}'s entry, as it stands.` : 'Four lines, and we can draw your sky.'}</h1>
-          <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: MUTED, textWrap: 'pretty' }}>{profile ? 'Change anything below and the chart, transits and numbers will be redrawn from the new details.' : 'Everything here is used to compute planetary positions and nothing else. Check it carefully: saved details can only be corrected a few times.'}</p>
+          <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: '#5F8B7A' }}>{t('The logbook')}</span>
+          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(32px,8vw,44px)', lineHeight: 1.08, textWrap: 'balance' }}>{profile ? t("{name}'s entry, as it stands.", { name: profile.firstName }) : t('Four lines, and we can draw your sky.')}</h1>
+          <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: MUTED, textWrap: 'pretty' }}>{profile ? t('Change anything below and the chart, transits and numbers will be redrawn from the new details.') : t('Everything here is used to compute planetary positions and nothing else. Check it carefully: saved details can only be corrected a few times.')}</p>
         </div>
 
         {profiles && profiles.length > 0 && (
-          <nav aria-label="Whose details" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED }}>Whose details</span>
+          <nav aria-label={t('Whose details')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED }}>{t('Whose details')}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {profiles.map(p => {
                 const on = profile && p._id === profile._id;
                 return (
-                  <button key={p._id} type="button" disabled={p.disabled} aria-pressed={!!on} onClick={() => choose(p._id)} title={p.disabled ? 'Switched off. Switch them on from Account to edit.' : undefined}
+                  <button key={p._id} type="button" disabled={p.disabled} aria-pressed={!!on} onClick={() => choose(p._id)} title={p.disabled ? t('Switched off. Switch them on from Account to edit.') : undefined}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px 7px 7px', minHeight: 44, background: on ? 'rgba(244,236,220,.12)' : 'transparent', border: `1px solid ${on ? '#F4ECDC' : 'rgba(244,236,220,.25)'}`, color: '#F4ECDC', cursor: p.disabled ? 'not-allowed' : 'pointer', opacity: p.disabled ? 0.45 : 1, textAlign: 'left', font: 'inherit' }}>
                     {p.avatar
                       ? <img src={avatarImage(p.avatar)} alt="" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />
                       : <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid rgba(244,236,220,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontSize: 14 }}>{p.firstName.charAt(0)}</span>}
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 14 }}>{p.isPrimary ? 'You' : p.firstName}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.08em', textTransform: 'uppercase', color: p.disabled ? MUTED : p.editsLeft ? '#5F8B7A' : '#B4933F' }}>{p.disabled ? 'Switched off' : editsText(p.editsLeft)}</span>
+                      <span style={{ fontSize: 14 }}>{p.isPrimary ? t('You') : p.firstName}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.08em', textTransform: 'uppercase', color: p.disabled ? MUTED : p.editsLeft ? '#5F8B7A' : '#B4933F' }}>{p.disabled ? t('Switched off') : editsText(p.editsLeft)}</span>
                     </span>
                   </button>
                 );
               })}
-              <button type="button" onClick={() => setAdding(true)} style={{ minHeight: 44, padding: '0 14px', background: 'transparent', border: '1px dashed rgba(244,236,220,.35)', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}>+ Add someone</button>
+              <button type="button" onClick={() => setAdding(true)} style={{ minHeight: 44, padding: '0 14px', background: 'transparent', border: '1px dashed rgba(244,236,220,.35)', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}>{t('+ Add someone')}</button>
             </div>
-            {profiles.some(p => p.disabled) && <span style={{ fontSize: 12.5, color: MUTED }}>Switched-off people can be turned back on from <Link to="/account">Account</Link>.</span>}
+            {profiles.some(p => p.disabled) && <span style={{ fontSize: 12.5, color: MUTED }}>{t('Switched-off people can be turned back on from {link}.').split('{link}').map((x, i) => i ? [<Link key="a" to="/account">{t('Account')}</Link>, x] : x)}</span>}
           </nav>
         )}
 
@@ -101,18 +102,18 @@ export default function BirthDetails() {
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '6px 14px', borderLeft: `2px solid ${profile.editsLeft ? '#5F8B7A' : '#B4933F'}`, padding: '8px 14px', background: 'rgba(244,236,220,.05)' }}>
             <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: profile.editsLeft ? '#5F8B7A' : '#B4933F' }}>{editsText(profile.editsLeft)}</span>
             <span style={{ fontSize: 13.5, lineHeight: 1.5, color: MUTED, textWrap: 'pretty' }}>{profile.editsLeft
-              ? `${profile.isPrimary ? 'Your own profile' : 'A saved person'} can be changed ${profile.isPrimary ? `${EDIT_LIMITS.primary} times` : 'once'} in all. Saving a new name, date, time or place uses one; the portrait does not.`
-              : 'Every edit for this profile has been used, so its details are now fixed.'}</span>
+              ? (profile.isPrimary ? t('Your own profile can be changed {n} times in all. Saving a new name, date, time or place uses one; the portrait does not.', { n: EDIT_LIMITS.primary }) : t('A saved person can be changed once in all. Saving a new name, date, time or place uses one; the portrait does not.'))
+              : t('Every edit for this profile has been used, so its details are now fixed.')}</span>
           </div>
         )}
 
         {profile !== null && !(profile && profile.editsLeft === 0) && (
-          <ProfileForm key={profile ? profile._id : 'new'} defaultName={saved} profile={profile || null} withRelationship={!!profile && profile.relationship !== 'self'} submitLabel={profile ? 'Save and redraw' : 'Draw my chart'} busyLabel={profile ? 'Saving…' : 'Drawing…'} onSaved={() => navigate('/natal-chart')} />
+          <ProfileForm key={profile ? profile._id : 'new'} defaultName={saved} profile={profile || null} withRelationship={!!profile && profile.relationship !== 'self'} submitLabel={profile ? t('Save and redraw') : t('Draw my chart')} busyLabel={profile ? t('Saving…') : t('Drawing…')} onSaved={() => navigate(profile ? '/natal-chart' : '/choose-astrologer?welcome=1')} />
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, borderTop: '1px solid rgba(244,236,220,.25)', paddingTop: 18 }}>
           <div style={{ flex: '0 0 auto', width: 56, height: 56 }}><Compass /></div>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: MUTED, textWrap: 'pretty' }}>Your birthplace is matched against Google Places, then converted to UTC using the time zone in force there on that date, including daylight-saving shifts.</p>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: MUTED, textWrap: 'pretty' }}>{t('Your birthplace is matched against Google Places, then converted to UTC using the time zone in force there on that date, including daylight-saving shifts.')}</p>
         </div>
       </main>
     </div>

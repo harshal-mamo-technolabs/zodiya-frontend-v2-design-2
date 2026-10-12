@@ -1,5 +1,7 @@
 /* Production builds call the API subdomain set in VITE_API_URL (.env). In dev
    it is unset and calls go through Vite's /api proxy. */
+import { getLang, t } from '../i18n/index.js';
+
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
 export class ApiError extends Error {
@@ -20,14 +22,14 @@ const OPEN_PAGES = ['/', '/login', '/signup', '/subscription', '/checkout', '/bi
 function messageFrom(data, status) {
   const msg = data && Array.isArray(data.errors) && data.errors[0] && data.errors[0].msg;
   if (msg) return msg;
-  if (status === 401) return 'Your session has expired. Please log in again.';
-  return `Request failed (${status})`;
+  if (status === 401) return t('Your session has expired. Please log in again.');
+  return t('Request failed ({status})', { status });
 }
 
 /* The access cookie lives an hour. When it lapses the first 401 triggers one
    refresh, shared by every request that fails in the same moment, and the
    original request is retried once. Sign-in itself never refreshes. */
-const NO_REFRESH = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'];
+const NO_REFRESH = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout', '/auth/handoff'];
 let refreshing = null;
 const refreshSession = () => {
   refreshing = refreshing || fetch(BASE + '/auth/refresh', { method: 'POST', credentials: 'include' })
@@ -43,13 +45,14 @@ async function call(path, { method = 'GET', body, signal, retried = false } = {}
     res = await fetch(BASE + path, {
       method,
       credentials: 'include',
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
+      // FormData sets its own multipart boundary
+      headers: body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : undefined,
+      body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
       signal
     });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    throw new ApiError(0, 'Could not reach the server. Please try again.');
+    throw new ApiError(0, t('Could not reach the server. Please try again.'));
   }
 
   if (res.status === 401 && !retried && !NO_REFRESH.some(p => path.startsWith(p))) {
@@ -88,6 +91,9 @@ export const logout = () => call('/auth/logout', { method: 'POST' }).finally(() 
 export const getMe = () => call('/auth/me');
 export const getStats = () => call('/stats');
 export const updateMe = body => call('/auth/me', { method: 'PATCH', body });
+/* Arriving from the onboarding funnel: its one-time token becomes this app's
+   session. A fresh account, so it also starts with no astrologer chosen. */
+export const redeemHandoff = token => call('/auth/handoff', { method: 'POST', body: { token } }).then(r => { newSession(['meridian_astrologer']); return r; });
 export const deleteMe = () => call('/auth/me', { method: 'DELETE' }).then(r => { newSession(['meridian_astrologer']); return r; });
 
 /* Enabled profiles only; the account page passes true to manage disabled ones too. */
@@ -97,25 +103,35 @@ export const updateProfile = (id, body) => call(`/profiles/${id}`, { method: 'PA
 // profiles are never deleted, only switched off and on
 export const setProfileDisabled = (id, disabled) => call(`/profiles/${id}/disabled`, { method: 'PATCH', body: { disabled } });
 export const saveBirthName = (id, birthName) => updateProfile(id, { birthName });
-export const getChart = (id, lang = 'en') => call(`/profiles/${id}/chart?lang=${lang}`);
-export const getHoroscope = ({ sign, period = 'daily', date, tz, lang = 'en' }) => call(`/horoscope?${new URLSearchParams({ sign, period, date, tz, lang })}`);
-export const getSynastry = (id, otherId, lang = 'en') => call(`/profiles/${id}/synastry/${otherId}?lang=${lang}`);
-export const getTransits = (id, lang = 'en') => call(`/profiles/${id}/transits?lang=${lang}`);
+export const getChart = (id, lang = getLang()) => call(`/profiles/${id}/chart?lang=${lang}`);
+export const getHoroscope = ({ sign, period = 'daily', date, tz, lang = getLang() }) => call(`/horoscope?${new URLSearchParams({ sign, period, date, tz, lang })}`);
+export const getSynastry = (id, otherId, lang = getLang()) => call(`/profiles/${id}/synastry/${otherId}?lang=${lang}`);
+export const getTransits = (id, lang = getLang()) => call(`/profiles/${id}/transits?lang=${lang}`);
 
 export const shareProfile = id => call(`/profiles/${id}/share`, { method: 'POST' });
 export const revokeShare = id => call(`/profiles/${id}/share`, { method: 'DELETE' });
-export const getSharedChart = (token, lang = 'en') => call(`/shared/${encodeURIComponent(token)}?lang=${lang}`);
+export const getSharedChart = (token, lang = getLang()) => call(`/shared/${encodeURIComponent(token)}?lang=${lang}`);
 
-export const numerology = (body, lang = 'en') => call(`/numerology?lang=${lang}`, { method: 'POST', body });
-export const drawTarot = (spread, lang = 'en') => call(`/tarot/draw?lang=${lang}`, { method: 'POST', body: { spread } });
+export const numerology = (body, lang = getLang()) => call(`/numerology?lang=${lang}`, { method: 'POST', body });
+/* multipart: photo, hand, dominant, lang, and profileId or name (+ gender, age).
+   Readings are stored on the account; image URLs are signed and expire, so a
+   reading is always fetched fresh when opened. */
+export const readPalm = form => call('/palm/read', { method: 'POST', body: form });
+export const highlightReading = id => call(`/palm/readings/${id}/highlight`, { method: 'POST' });
+export const listPalmReadings = ({ before } = {}) => call(`/palm/readings?${new URLSearchParams(before ? { limit: 20, before } : { limit: 20 })}`);
+export const getPalmReading = id => call(`/palm/readings/${id}`);
+export const deletePalmReading = id => call(`/palm/readings/${id}`, { method: 'DELETE' });
+export const drawTarot = (spread, lang = getLang()) => call(`/tarot/draw?lang=${lang}`, { method: 'POST', body: { spread } });
 
 export const searchPlaces = (q, signal) => call(`/places?q=${encodeURIComponent(q)}`, { signal });
 export const placeDetails = placeId => call(`/places/${encodeURIComponent(placeId)}`);
 
-export const astrologerPreview = id => call(`/astrologer/characters/${id}/preview`);
-export const astrologerSession = body => call('/astrologer/session', { method: 'POST', body });
+export const astrologerPreview = id => call(`/astrologer/characters/${id}/preview?lang=${getLang()}`);
+export const astrologerSession = body => call('/astrologer/session', { method: 'POST', body: { ...body, lang: getLang() } });
 export const endAstrologerSession = id => call(`/astrologer/session/${id}/end`, { method: 'POST' });
 
+// Help Scout secure mode: who the support chat is talking to
+export const helpscoutSignature = () => call('/helpscout/signature');
 export const billingCatalog = () => call('/billing/catalog');
 export const billingStatus = () => call('/billing/status');
 export const billingSync = paymentIntentId => call('/billing/sync', { method: 'POST', body: paymentIntentId ? { paymentIntentId } : {} });
@@ -129,4 +145,4 @@ export const payOpenInvoice = kind => call('/billing/pay-open', { method: 'POST'
 export const getCard = () => call('/billing/card');
 export const startCardSetup = () => call('/billing/card', { method: 'POST' });
 export const saveCard = setupIntentId => call('/billing/card', { method: 'PUT', body: { setupIntentId } });
-export const listInvoices = () => call('/billing/invoices');
+export const listReceipts = () => call('/billing/receipts');

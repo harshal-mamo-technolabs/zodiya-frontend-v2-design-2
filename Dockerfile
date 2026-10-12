@@ -13,6 +13,8 @@ COPY . .
 
 # Build the React app; Vite bakes VITE_API_URL into the bundle
 ARG VITE_API_URL
+# optional: without it the support page has no chat
+ARG VITE_HELPSCOUT_BEACON_ID
 RUN test -n "$VITE_API_URL" && npm run build
 
 # Production stage with nginx

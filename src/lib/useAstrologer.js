@@ -5,6 +5,7 @@ import { READINGS, SPEED, getHistory, saveHistory, clearHistory } from './astrol
 import { alignToWords, pacedWords } from './captions.js';
 import { runOnPage } from './pageActions.js';
 import { writeActive } from './active-profile.js';
+import { getLang } from '../i18n/index.js';
 
 const IDLE_END_MS = 60_000; // a quiet session is closed so it stops spending minutes
 const THINK_TIMEOUT_MS = 20_000;
@@ -122,7 +123,9 @@ export function useAstrologer({ prefs, profileId, page, navigate }) {
         signedUrl,
         textOnly,
         dynamicVariables,
-        overrides: { tts: { speed: SPEED[p.rate] || SPEED.normal }, ...(textOnly ? { conversation: { textOnly: true } } : {}) },
+        // the agent hears and speaks the portal's language (a language preset on the
+        // agent); English is the agent's default, so it needs no override
+        overrides: { ...(getLang() !== 'en' ? { agent: { language: getLang() } } : {}), tts: { speed: SPEED[p.rate] || SPEED.normal }, ...(textOnly ? { conversation: { textOnly: true } } : {}) },
         clientTools: {
           open_reading: async ({ page: key, partner }) => {
             const r = READINGS[key]; if (!r) return 'unknown page';
@@ -146,6 +149,12 @@ export function useAstrologer({ prefs, profileId, page, navigate }) {
             if (window.location.pathname !== READINGS.tarot[1]) navigate(READINGS.tarot[1]);
             pendingRef.current = 'tarot';
             return runOnPage('tarot', args);
+          },
+          // turns the globe to a place; the page answers with the lines really near it
+          astrocartography: async args => {
+            if (window.location.pathname !== READINGS.astrocartography[1]) navigate(READINGS.astrocartography[1]);
+            pendingRef.current = 'astrocartography';
+            return runOnPage('astrocartography', args, 8000);
           }
         },
         onModeChange: ({ mode: m }) => {

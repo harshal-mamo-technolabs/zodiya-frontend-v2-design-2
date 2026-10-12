@@ -6,7 +6,9 @@ import { Wheel } from './NatalChart.jsx';
 import MoodDial from '../components/MoodDial.jsx';
 import { getChart, getHoroscope, getTransits, listProfiles, numerology } from '../lib/api.js';
 import { readActive } from '../lib/active-profile.js';
-import { toChartView, SIGN_GLYPH } from '../lib/chart-view.js';
+import { useSales } from '../lib/billing.js';
+import { toChartView, SIGN_GLYPH, dobText } from '../lib/chart-view.js';
+import { getLang, locale, t } from '../i18n/index.js';
 
 /* A port of Home.dc.html: one column on a phone, hero + sticky wheel on a desk. */
 
@@ -15,8 +17,6 @@ const SERIF = "'Cormorant Garamond',Georgia,serif";
 const SYM = "'Noto Sans Symbols','Segoe UI Symbol','Apple Symbols',serif";
 const GOLD = '#B4933F', COP = '#5F8B7A';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const CSS = `
 .om-shell{container-type:inline-size;width:100%}
@@ -39,7 +39,7 @@ const CSS = `
 
 const jdOf = d => d.getTime() / 86400000 + 2440587.5;
 
-/** Mean synodic month is close enough for a header label. */
+/** Mean synodic month is close enough for a header label. English; shown through t(). */
 function moonPhase(d) {
   const age = (((jdOf(d) - 2451550.1) % 29.530588853) + 29.530588853) % 29.530588853;
   const names = ['New moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'];
@@ -55,8 +55,9 @@ function siderealTime(d, lon) {
 }
 
 const latText = lat => { const a = Math.abs(lat), d = Math.floor(a); return `${d}°${String(Math.round((a - d) * 60)).padStart(2, '0')}′${lat < 0 ? 'S' : 'N'}`; };
-const shortDate = iso => { const [, m, d] = iso.split('-'); return `${+d} ${MONTHS[+m - 1]}`; };
-const dobText = iso => { const [y, m, d] = iso.split('-'); return `${d} ${MONTHS[+m - 1]} ${y}`; };
+const shortDate = iso => new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale(), { day: 'numeric', month: 'short', timeZone: 'UTC' });
+/* German capitalises nouns, so the aspect name is only lowered in English. */
+const lower = s => (getLang() === 'en' ? s.toLowerCase() : s);
 
 const Glyph = ({ sign }) => (
   <svg viewBox="0 0 32 32" width="100%" height="100%" aria-hidden="true" style={{ display: 'block', overflow: 'visible' }}>
@@ -69,6 +70,7 @@ const link19 = { fontFamily: SERIF, fontSize: 19, borderBottom: 'none' };
 const note = { fontFamily: MONO, fontSize: 10, color: 'rgba(244,236,220,.5)' };
 
 export default function Dashboard() {
+  const sales = useSales();
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -104,9 +106,9 @@ export default function Dashboard() {
 
   const now = new Date();
   const hr = now.getHours();
-  const greeting = hr < 5 ? 'Still up' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = t(hr < 5 ? 'Still up' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening');
   // the mean-lunation estimate only bridges the gap until the exact phase arrives with the horoscope
-  const dateLine = `${WEEKDAYS[now.getDay()]} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${horo ? horo.moonLine.split(' · ')[0] : moonPhase(now)}`;
+  const dateLine = `${now.toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' })} · ${horo ? horo.moonLine.split(' · ')[0] : t(moonPhase(now))}`;
   const placements = chart ? [['Sun', chart.big3.sun], ['Moon', chart.big3.moon], ['Rising', chart.big3.rising]] : [];
   const placeDob = `${[profile.city, profile.country].filter(Boolean).join(', ')} · ${dobText(profile.birthDate)}`;
 
@@ -119,16 +121,16 @@ export default function Dashboard() {
   const when = e => {
     const exactToday = e.exactDate === transits.days[today];
     const orb = e.daily[today - e.span[0]]?.orb;
-    if (exactToday) return `Exact today${orb != null ? ` · within ${Math.floor(orb)}°${String(Math.round((orb % 1) * 60)).padStart(2, '0')}′` : ''}`;
-    return `Exact ${shortDate(e.exactDate)} · ${e.exactDate > transits.days[today] ? 'applying' : 'separating'}`;
+    if (exactToday) return orb != null ? t('Exact today · within {orb}', { orb: `${Math.floor(orb)}°${String(Math.round((orb % 1) * 60)).padStart(2, '0')}′` }) : t('Exact today');
+    return t(e.exactDate > transits.days[today] ? 'Exact {date} · applying' : 'Exact {date} · separating', { date: shortDate(e.exactDate) });
   };
   const rows = active.slice(0, 3).map((e, i) => ({
     id: e.id, rank: ROMAN[i],
-    name: `${e.transitName} ${e.aspectName.toLowerCase()} natal ${e.natalName}`,
+    name: t('{transit} {aspect} natal {natal}', { transit: e.transitName, aspect: lower(e.aspectName), natal: e.natalName }),
     when: when(e), strength: (e.weight / 5 * 100) + '%'
   }));
   const lede = top ? top.lede : (transits?.labels.quiet ?? '');
-  const sub = top ? `${top.title} is exact ${top.exactDate === transits.days[today] ? 'today' : 'on ' + shortDate(top.exactDate)}${top.exactDate > transits.days[today] ? ' and still building' : ''}. ${top.text.split(/(?<=\.)\s/)[0]}` : '';
+  const sub = top ? `${t(top.exactDate === transits.days[today] ? '{title} is exact today.' : top.exactDate > transits.days[today] ? '{title} is exact on {date} and still building.' : '{title} is exact on {date}.', { title: top.title, date: shortDate(top.exactDate) })} ${top.text.split(/(?<=\.)\s/)[0]}` : '';
 
   const lifePath = numbers?.numbers.find(n => n.key === 'lifePath')?.value ?? null;
   /* Exact after today and not yet in orb: what the next fortnight brings. */
@@ -136,10 +138,10 @@ export default function Dashboard() {
     .filter(e => e.span[0] > today)
     .sort((a, b) => a.span[0] - b.span[0] || b.weight - a.weight)
     .slice(0, 3) : [];
-  const dominant = chart ? `Mostly ${chart.dominants.topElement} · ${chart.dominants.topModality}` : '';
+  const dominant = chart ? t('Mostly {element} · {modality}', { element: t(chart.dominants.topElement), modality: t(chart.dominants.topModality) }) : '';
 
   const me = profiles.find(p => p.isPrimary) || profile;
-  const pairs = profiles.filter(p => p._id !== me._id).map(p => ({ id: p._id, names: `${me.firstName} & ${p.firstName}`, word: p.relationship || 'other' }));
+  const pairs = profiles.filter(p => p._id !== me._id).map(p => ({ id: p._id, names: `${me.firstName} & ${p.firstName}`, word: t(p.relationship || 'other') }));
 
   return (
     <div className="om-shell" style={{ minHeight: '100vh', background: '#1C2538', color: '#F4ECDC', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: "'Instrument Sans',Helvetica,Arial,sans-serif" }}>
@@ -166,42 +168,42 @@ export default function Dashboard() {
               {placements.map(([body, sign]) => (
                 <span key={body} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 15, height: 15, flex: '0 0 auto', display: 'block', filter: 'drop-shadow(0 0 5px rgba(244,236,220,.5))', animation: 'om-glow 5s ease-in-out infinite' }}><Glyph sign={sign} /></span>
-                  <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase', color: 'rgba(244,236,220,.6)' }}>{body} {sign}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase', color: 'rgba(244,236,220,.6)' }}>{t(body)} {t(sign)}</span>
                 </span>
               ))}
             </div>
           </div>
 
           <Link to="/transits" className="om-cream" style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingTop: 24, borderTop: '1px solid rgba(180,147,63,.6)', borderBottom: 'none' }}>
-            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.18em', textTransform: 'uppercase', color: GOLD }}>Today · for your chart</span>
+            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.18em', textTransform: 'uppercase', color: GOLD }}>{t('Today · for your chart')}</span>
             <p className="om-lede" style={{ margin: 0, fontFamily: SERIF, fontWeight: 400, fontSize: 28, lineHeight: 1.24, letterSpacing: '-.005em', textWrap: 'pretty' }}>{lede}</p>
             {sub && <span style={{ fontSize: 14, lineHeight: 1.6, color: 'rgba(244,236,220,.7)', maxWidth: '44ch', textWrap: 'pretty' }}>{sub}</span>}
-            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>Read the full reading →</span>
+            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>{t('Read the full reading →')}</span>
           </Link>
         </section>
 
         <Link to="/natal-chart" className="om-wheel om-cream" style={{ gridArea: 'wheel', display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center', animation: 'om-rise .6s cubic-bezier(.3,0,.2,1) .2s both', borderBottom: 'none' }}>
           <div style={{ width: '100%', maxWidth: 440, aspectRatio: '1 / 1', padding: '0 4%' }}><Wheel chart={chart} name={profile.firstName} /></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', textAlign: 'center' }}>
-            <span style={{ fontFamily: SERIF, fontSize: 19, letterSpacing: '.02em' }}>Your natal chart</span>
+            <span style={{ fontFamily: SERIF, fontSize: 19, letterSpacing: '.02em' }}>{t('Your natal chart')}</span>
             <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(244,236,220,.5)' }}>{placeDob}</span>
           </div>
         </Link>
 
         <section style={{ gridArea: 'sky', display: 'flex', flexDirection: 'column', gap: 4, animation: 'om-rise .6s cubic-bezier(.3,0,.2,1) .3s both' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, paddingBottom: 14 }}>
-            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24, letterSpacing: '.01em' }}>Current sky</h2>
-            <Link to="/transits" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.55)', borderBottom: 'none' }}>All transits</Link>
+            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24, letterSpacing: '.01em' }}>{t('Current sky')}</h2>
+            <Link to="/transits" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.55)', borderBottom: 'none' }}>{t('All transits')}</Link>
           </div>
-          {rows.map(t => (
-            <Link key={t.id} to="/transits" className="om-cream" style={{ display: 'flex', alignItems: 'baseline', gap: 16, padding: '16px 0', borderTop: '1px solid rgba(244,236,220,.13)', borderBottom: 'none' }}>
-              <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.08em', color: GOLD, width: 18, flex: '0 0 auto' }}>{t.rank}</span>
+          {rows.map(r => (
+            <Link key={r.id} to="/transits" className="om-cream" style={{ display: 'flex', alignItems: 'baseline', gap: 16, padding: '16px 0', borderTop: '1px solid rgba(244,236,220,.13)', borderBottom: 'none' }}>
+              <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.08em', color: GOLD, width: 18, flex: '0 0 auto' }}>{r.rank}</span>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-                <span style={{ fontSize: 15.5, lineHeight: 1.35, textWrap: 'pretty' }}>{t.name}</span>
-                <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.08em', color: 'rgba(244,236,220,.5)' }}>{t.when}</span>
+                <span style={{ fontSize: 15.5, lineHeight: 1.35, textWrap: 'pretty' }}>{r.name}</span>
+                <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.08em', color: 'rgba(244,236,220,.5)' }}>{r.when}</span>
               </div>
               <span style={{ width: 40, height: 2, flex: '0 0 auto', marginRight: 2, background: 'rgba(244,236,220,.16)', position: 'relative', alignSelf: 'center' }}>
-                <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: t.strength, background: GOLD, display: 'block' }} />
+                <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: r.strength, background: GOLD, display: 'block' }} />
               </span>
             </Link>
           ))}
@@ -210,12 +212,12 @@ export default function Dashboard() {
           )}
           {upcoming.length > 0 && (
             <>
-              <span style={{ ...eyebrow, paddingTop: 22 }}>Coming up</span>
+              <span style={{ ...eyebrow, paddingTop: 22 }}>{t('Coming up')}</span>
               {upcoming.map(e => (
                 <Link key={e.id} to="/transits" className="om-cream" style={{ display: 'flex', alignItems: 'baseline', gap: 16, padding: '12px 0', borderTop: '1px solid rgba(244,236,220,.13)', borderBottom: 'none', color: 'rgba(244,236,220,.75)' }}>
                   <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.08em', color: GOLD, width: 52, flex: '0 0 auto' }}>{shortDate(transits.days[e.span[0]])}</span>
-                  <span style={{ flex: 1, fontSize: 14.5, lineHeight: 1.35, minWidth: 0 }}>{e.transitName} {e.aspectName.toLowerCase()} natal {e.natalName}</span>
-                  <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.08em', color: 'rgba(244,236,220,.5)', flex: '0 0 auto' }}>exact {shortDate(e.exactDate)}</span>
+                  <span style={{ flex: 1, fontSize: 14.5, lineHeight: 1.35, minWidth: 0 }}>{t('{transit} {aspect} natal {natal}', { transit: e.transitName, aspect: lower(e.aspectName), natal: e.natalName })}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.08em', color: 'rgba(244,236,220,.5)', flex: '0 0 auto' }}>{t('exact {date}', { date: shortDate(e.exactDate) })}</span>
                 </Link>
               ))}
             </>
@@ -225,8 +227,8 @@ export default function Dashboard() {
         {/* ---------------------------------------------- your sign today */}
         <section style={{ gridArea: 'sign', display: 'flex', flexDirection: 'column', gap: 4, animation: 'om-rise .6s cubic-bezier(.3,0,.2,1) .35s both' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, paddingBottom: 14 }}>
-            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24, letterSpacing: '.01em' }}>Your sign today{horo ? ` · ${horo.signName}` : ''}</h2>
-            <Link to="/daily-horoscope" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.55)', borderBottom: 'none' }}>Full reading</Link>
+            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24, letterSpacing: '.01em' }}>{t('Your sign today')}{horo ? ` · ${horo.signName}` : ''}</h2>
+            <Link to="/daily-horoscope" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.55)', borderBottom: 'none' }}>{t('Full reading')}</Link>
           </div>
           {horo && (
             <>
@@ -265,8 +267,8 @@ export default function Dashboard() {
         {/* -------------------------------------------- your chart, your numbers */}
         <section style={{ gridArea: 'chart', display: 'flex', flexDirection: 'column', gap: 4, animation: 'om-rise .6s cubic-bezier(.3,0,.2,1) .4s both' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, paddingBottom: 14 }}>
-              <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24, letterSpacing: '.01em' }}>Your chart in a sentence</h2>
-              <Link to="/natal-chart" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.55)', borderBottom: 'none' }}>Full chart</Link>
+              <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24, letterSpacing: '.01em' }}>{t('Your chart in a sentence')}</h2>
+              <Link to="/natal-chart" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.55)', borderBottom: 'none' }}>{t('Full chart')}</Link>
             </div>
             {chart && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 14, borderTop: '1px solid rgba(244,236,220,.13)' }}>
@@ -286,8 +288,8 @@ export default function Dashboard() {
 
         <section style={{ gridArea: 'numbers', display: 'flex', flexDirection: 'column', gap: 4, animation: 'om-rise .6s cubic-bezier(.3,0,.2,1) .45s both' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, paddingBottom: 14 }}>
-              <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24, letterSpacing: '.01em' }}>Your numbers</h2>
-              <Link to="/numerology" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.55)', borderBottom: 'none' }}>All numbers</Link>
+              <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 24, letterSpacing: '.01em' }}>{t('Your numbers')}</h2>
+              <Link to="/numerology" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.55)', borderBottom: 'none' }}>{t('All numbers')}</Link>
             </div>
             {numbers && (
               <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(244,236,220,.13)' }}>
@@ -301,7 +303,7 @@ export default function Dashboard() {
                   </Link>
                 ))}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 0 0' }}>
-                  <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.16em', textTransform: 'uppercase', color: GOLD }}>Personal year {numbers.personalYear.value} · {numbers.personalYear.year}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.16em', textTransform: 'uppercase', color: GOLD }}>{t('Personal year {value} · {year}', { value: numbers.personalYear.value, year: numbers.personalYear.year })}</span>
                   <span style={{ fontFamily: SERIF, fontSize: 19 }}>{numbers.personalYear.heading}</span>
                   <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'rgba(244,236,220,.7)', textWrap: 'pretty' }}>{numbers.personalYear.meaning.split(/(?<=\.)\s/)[0]}</p>
                 </div>
@@ -311,7 +313,7 @@ export default function Dashboard() {
 
         <section className="om-more" style={{ gridArea: 'more', display: 'flex', flexDirection: 'column', gap: 28, animation: 'om-rise .6s cubic-bezier(.3,0,.2,1) .4s both' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <span style={eyebrow}>Synastry</span>
+            <span style={eyebrow}>{t('Synastry')}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 20px' }}>
               {pairs.map(s => (
                 <Link key={s.id} to={`/synastry?with=${s.id}`} style={{ display: 'flex', alignItems: 'baseline', gap: 8, borderBottom: 'none' }}>
@@ -319,20 +321,20 @@ export default function Dashboard() {
                   <span style={{ fontFamily: MONO, fontSize: 10, color: GOLD }}>{s.word}</span>
                 </Link>
               ))}
-              {!pairs.length && <span style={{ ...link19, color: 'rgba(244,236,220,.5)' }}>Add someone from the portrait in the header</span>}
+              {!pairs.length && <span style={{ ...link19, color: 'rgba(244,236,220,.5)' }}>{t('Add someone from the portrait in the header')}</span>}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <span style={eyebrow}>Also today</span>
+            <span style={eyebrow}>{t('Also today')}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 20px' }}>
-              <Link to="/tarot" style={link19}>Tarot <span style={note}>card ready</span></Link>
-              <Link to="/numerology" style={link19}>Numerology <span style={note}>{lifePath != null ? `Life path ${lifePath}` : ''}</span></Link>
+              <Link to="/tarot" style={link19}>{t('Tarot')} <span style={note}>{t('card ready')}</span></Link>
+              <Link to="/numerology" style={link19}>{t('Numerology')} <span style={note}>{lifePath != null ? t('Life path {n}', { n: lifePath }) : ''}</span></Link>
             </div>
           </div>
-          <p style={{ margin: 0, maxWidth: '42ch', fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, lineHeight: 1.5, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>Need longer with your astrologer? Top up minutes whenever you like. <Link to="/billing" style={{ fontFamily: MONO, fontStyle: 'normal', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD, whiteSpace: 'nowrap', borderBottom: 'none' }}>Top up →</Link></p>
+          {sales !== false && <p style={{ margin: 0, maxWidth: '42ch', fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, lineHeight: 1.5, color: 'rgba(244,236,220,.78)', textWrap: 'pretty' }}>{t('Need longer with your astrologer? Top up minutes whenever you like.')} <Link to="/billing" style={{ fontFamily: MONO, fontStyle: 'normal', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD, whiteSpace: 'nowrap', borderBottom: 'none' }}>{t('Top up →')}</Link></p>}
         </section>
 
-        <span className="om-foot" style={{ gridArea: 'foot', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.35)', lineHeight: 1.8 }}>Sky as seen from {latText(profile.lat)} · sidereal time {siderealTime(now, profile.lon)}</span>
+        <span className="om-foot" style={{ gridArea: 'foot', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(244,236,220,.35)', lineHeight: 1.8 }}>{t('Sky as seen from {lat} · sidereal time {time}', { lat: latText(profile.lat), time: siderealTime(now, profile.lon) })}</span>
       </main>
     </div>
   );

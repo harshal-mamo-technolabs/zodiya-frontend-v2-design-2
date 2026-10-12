@@ -5,6 +5,7 @@ import NavMenu from '../components/NavMenu.jsx';
 import { drawTarot } from '../lib/api.js';
 import { registerPage } from '../lib/pageActions.js';
 import { tarotImage } from '../lib/assets.js';
+import { t } from '../i18n/index.js';
 
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',Georgia,serif";
@@ -42,7 +43,7 @@ function Face({ card, w, h }) {
 /** A face-down card that turns over on click. */
 function FlipCard({ card, revealed, onReveal, w, h }) {
   return (
-    <button type="button" onClick={onReveal} aria-pressed={revealed} aria-label={revealed ? `${card.name}, ${card.orientation}` : `Turn the ${card.position} card`} style={{ width: w, maxWidth: '78vw', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, color: 'inherit' }}>
+    <button type="button" onClick={onReveal} aria-pressed={revealed} aria-label={revealed ? `${card.name}, ${card.orientation}` : t('Turn the {position} card', { position: card.position })} style={{ width: w, maxWidth: '78vw', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, color: 'inherit' }}>
       <div style={{ perspective: 1200, width: '100%', aspectRatio: `${w} / ${h}` }}>
         <div style={{ position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d', transition: 'transform .8s cubic-bezier(.2,.8,.25,1)', transform: revealed ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
           <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', borderRadius: 6, overflow: 'hidden', boxShadow: '0 18px 36px rgba(0,0,0,.5), 0 0 0 1px rgba(180,147,63,.2)' }}><Back /></div>
@@ -126,13 +127,13 @@ export default function Tarot() {
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '40px 24px 64px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 40 }}>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14 }}>
-          <div style={{ ...lbl, color: COP }}>Tarot</div>
-          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(32px,5vw,50px)', lineHeight: 1.06, maxWidth: 660, textWrap: 'balance' }}>{draw?.headline ?? 'Shuffling…'}</h1>
+          <div style={{ ...lbl, color: COP }}>{t('Tarot')}</div>
+          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(32px,5vw,50px)', lineHeight: 1.06, maxWidth: 660, textWrap: 'balance' }}>{draw?.headline ?? t('Shuffling…')}</h1>
           <p style={{ margin: 0, fontSize: 16.5, lineHeight: 1.6, color: MUTED, maxWidth: 480, textWrap: 'pretty' }}>{draw?.subline ?? ''}</p>
 
           <div role="tablist" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 4, padding: 4, border: HAIR, background: 'rgba(244,236,220,.03)', width: '100%', maxWidth: 420, marginTop: 12 }}>
             {(draw?.spreads ?? [{ key: 'single', label: 'Single card' }, { key: 'three', label: 'Three cards' }, { key: 'yesNo', label: 'Yes / no' }]).map(s => (
-              <button key={s.key} type="button" role="tab" aria-selected={spread === s.key} onClick={() => pick(s.key)} style={{ padding: '12px 4px', border: 'none', cursor: 'pointer', background: spread === s.key ? 'rgba(180,147,63,.16)' : 'transparent', color: spread === s.key ? LIT : MUTED, fontFamily: MONO, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase' }}>{s.label}</button>
+              <button key={s.key} type="button" role="tab" aria-selected={spread === s.key} onClick={() => pick(s.key)} style={{ padding: '12px 4px', border: 'none', cursor: 'pointer', background: spread === s.key ? 'rgba(180,147,63,.16)' : 'transparent', color: spread === s.key ? LIT : MUTED, fontFamily: MONO, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase' }}>{draw?.spreads ? s.label : t(s.label)}</button>
             ))}
           </div>
         </div>
@@ -150,7 +151,7 @@ export default function Tarot() {
 
         {verdict && (
           <div style={{ padding: '30px 40px', border: '1px solid rgba(180,147,63,.4)', background: 'linear-gradient(180deg,rgba(180,147,63,.12),rgba(180,147,63,.03))', textAlign: 'center', maxWidth: 640, animation: 'om-nav-fade .4s ease both' }}>
-            <div style={{ ...lbl, color: GOLD, marginBottom: 12 }}>The answer</div>
+            <div style={{ ...lbl, color: GOLD, marginBottom: 12 }}>{t('The answer')}</div>
             <div style={{ fontFamily: SERIF, fontSize: 58, lineHeight: 1, marginBottom: 14 }}>{verdict.title}</div>
             <div style={{ fontSize: 16.5, lineHeight: 1.6, color: CREAM, textWrap: 'pretty' }}>{verdict.line}</div>
           </div>
@@ -181,7 +182,7 @@ export default function Tarot() {
         )}
 
         <button type="button" onClick={() => shuffle(spread)} className="hov-wash-10" style={{ height: 50, padding: '0 32px', border: HAIR, background: 'transparent', color: CREAM, fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>
-          {draw?.shuffle ?? 'Shuffle a new spread'}
+          {draw?.shuffle ?? t('Shuffle a new spread')}
         </button>
       </main>
     </div>

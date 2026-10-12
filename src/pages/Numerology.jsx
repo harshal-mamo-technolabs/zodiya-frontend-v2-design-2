@@ -5,6 +5,7 @@ import NavMenu from '../components/NavMenu.jsx';
 import { listProfiles, numerology } from '../lib/api.js';
 import { checkDate, isoToInput } from '../lib/date-input.js';
 import { readActive } from '../lib/active-profile.js';
+import { t } from '../i18n/index.js';
 
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',Georgia,serif";
@@ -82,21 +83,21 @@ export default function Numerology() {
         {/* ------------------------------------------------------- left rail */}
         <div style={{ flex: '1 1 340px', minWidth: 0, maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 24 }}>
           <div>
-            <div style={{ ...lbl, color: COP, marginBottom: 14 }}>Numerology</div>
-            <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,5vw,44px)', lineHeight: 1.06, textWrap: 'balance' }}>Two facts. Five numbers.</h1>
+            <div style={{ ...lbl, color: COP, marginBottom: 14 }}>{t('Numerology')}</div>
+            <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,5vw,44px)', lineHeight: 1.06, textWrap: 'balance' }}>{t('Two facts. Five numbers.')}</h1>
           </div>
 
           {name && (
             <div style={{ ...card, gap: 14 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={lbl}>Full name at birth</span>
+                <span style={lbl}>{t('Full name at birth')}</span>
                 <span style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.2 }}>{name}</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={lbl}>Date of birth</span>
+                <span style={lbl}>{t('Date of birth')}</span>
                 <span style={{ fontFamily: MONO, fontSize: 20, letterSpacing: '.06em' }}>{dob}</span>
               </div>
-              <span style={{ fontSize: 12.5, lineHeight: 1.5, color: MUTED }}>From your active profile. Switch profiles from the menu. Pythagorean system, with the working shown for every number.</span>
+              <span style={{ fontSize: 12.5, lineHeight: 1.5, color: MUTED }}>{t('From your active profile. Switch profiles from the menu. Pythagorean system, with the working shown for every number.')}</span>
             </div>
           )}
 
@@ -107,7 +108,7 @@ export default function Numerology() {
           {result && (
             <>
               <div style={{ padding: '22px 22px', border: '1px solid rgba(95,139,122,.35)', background: 'rgba(95,139,122,.08)' }}>
-                <div style={{ ...lbl, color: COP, marginBottom: 10 }}>{result.firstName}, in brief</div>
+                <div style={{ ...lbl, color: COP, marginBottom: 10 }}>{t('{name}, in brief', { name: result.firstName })}</div>
                 <div style={{ fontFamily: SERIF, fontSize: 23, lineHeight: 1.34, textWrap: 'pretty' }}>{result.summary}</div>
               </div>
 
@@ -125,13 +126,13 @@ export default function Numerology() {
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px', border: HAIR, background: 'rgba(244,236,220,.03)' }}>
-                  <div style={lbl}>Lucky numbers</div>
+                  <div style={lbl}>{t('Lucky numbers')}</div>
                   <div style={{ display: 'flex', gap: 14 }}>
                     {result.lucky.map(n => <div key={n} style={{ fontFamily: SERIF, fontSize: 30, lineHeight: 1, color: GOLD }}>{n}</div>)}
                   </div>
                 </div>
                 <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px', border: HAIR, background: 'rgba(244,236,220,.03)' }}>
-                  <div style={lbl}>Favourable days</div>
+                  <div style={lbl}>{t('Favourable days')}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {result.days.map(d => <div key={d} style={{ fontFamily: SERIF, fontSize: 18, lineHeight: 1.2 }}>{d}</div>)}
                   </div>
@@ -144,11 +145,11 @@ export default function Numerology() {
 
         {/* ------------------------------------------------------ right rail */}
         <div style={{ flex: '2 1 460px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ ...lbl, marginBottom: 16 }}>Your five numbers</div>
+          <div style={{ ...lbl, marginBottom: 16 }}>{t('Your five numbers')}</div>
 
           {!result && (
             <div style={{ padding: '40px 0', fontFamily: SERIF, fontSize: 21, color: MUTED, lineHeight: 1.4 }}>
-              {error ? '' : 'Loading your numbers…'}
+              {error ? '' : t('Loading your numbers…')}
             </div>
           )}
 
@@ -157,7 +158,7 @@ export default function Numerology() {
               <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <Ring value={n.value} master={n.master} />
                 {n.master && (
-                  <div style={{ padding: '4px 10px', border: '1px solid rgba(180,147,63,.5)', fontFamily: MONO, fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase', color: LIT }}>Master number</div>
+                  <div style={{ padding: '4px 10px', border: '1px solid rgba(180,147,63,.5)', fontFamily: MONO, fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase', color: LIT }}>{t('Master number')}</div>
                 )}
               </div>
 

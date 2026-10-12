@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { billingCatalog, billingStatus, billingSync } from './api.js';
+import { locale, t } from '../i18n/index.js';
 
 /* Prices, plans and the publishable key all come from the API, so the
    amounts on screen are the amounts Stripe charges. */
@@ -8,6 +10,14 @@ export const getCatalog = () => {
   catalog = catalog || billingCatalog().catch(e => { catalog = null; throw e; });
   return catalog;
 };
+
+/* false when the API runs with PAYMENTS_ENABLED=false: the whole app is free and
+   nothing is sold, so no page may ask for money. null while still unknown. */
+export function useSales() {
+  const [on, setOn] = useState(null);
+  useEffect(() => { getCatalog().then(c => setOn(c.paymentsEnabled !== false)).catch(() => setOn(true)); }, []);
+  return on;
+}
 
 let stripe = null;
 export const getStripe = () => {
@@ -26,8 +36,8 @@ export const forgetStatus = () => { status = null; };
 window.addEventListener('meridian:session', forgetStatus);
 
 export const euros = cents => {
-  const v = cents / 100;
-  return `€${Number.isInteger(v) ? v : v.toFixed(2)}`;
+  const v = cents / 100, d = Number.isInteger(v) ? 0 : 2;
+  return new Intl.NumberFormat(locale(), { style: 'currency', currency: 'EUR', minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
 };
 
 export const minutesText = seconds => {
@@ -37,13 +47,14 @@ export const minutesText = seconds => {
 
 /** Lifetime edits per profile, as the API enforces them. */
 export const EDIT_LIMITS = { primary: 3, extra: 1 };
-export const editsText = n => (n === 0 ? 'No edits left' : `${n} ${n === 1 ? 'edit' : 'edits'} left`);
+export const editsText = n => (n === 0 ? t('No edits left') : t(n === 1 ? '{n} edit left' : '{n} edits left', { n }));
 
-export const packName = p => `${p.extra} extra ${p.extra === 1 ? 'profile' : 'profiles'}`;
+export const packName = p => t(p.extra === 1 ? '{n} extra profile' : '{n} extra profiles', { n: p.extra });
 
-export const cadence = months => (months === 1 ? 'month' : `${months} months`);
+export const cadence = months => (months === 1 ? t('month') : t('{n} months', { n: months }));
+export const every = months => (months === 1 ? t('every month') : t('every {n} months', { n: months }));
 
-export const longDate = iso => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+export const longDate = iso => new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' });
 
 /**
  * After the browser confirms a payment: pull the result from Stripe through

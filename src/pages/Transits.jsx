@@ -5,6 +5,7 @@ import NavMenu from '../components/NavMenu.jsx';
 import { getTransits, listProfiles } from '../lib/api.js';
 import { readActive } from '../lib/active-profile.js';
 import { BODY_GLYPH } from '../lib/chart-view.js';
+import { locale, t } from '../i18n/index.js';
 
 /* A port of Transits.dc.html: sixty-day plate, scrubbable timeline, one reading at a time. */
 
@@ -16,7 +17,6 @@ const GL = { ...BODY_GLYPH, asc: 'AC', mc: 'MC', newMoon: '☽', fullMoon: '☽'
 const SOFT = new Set(['trine', 'sextile']);
 const SLOW = new Set(['jupiter', 'saturn', 'uranus', 'neptune', 'pluto']);
 const RANK = ['I', 'II', 'III', 'IV'];
-const LOCALE = { en: 'en-GB' };
 
 const CSS = `
 .trt-range{-webkit-appearance:none;appearance:none;background:transparent;width:100%;height:44px;margin:0;cursor:ew-resize}
@@ -29,7 +29,7 @@ const CSS = `
 `;
 
 const utc = iso => new Date(`${iso}T00:00:00Z`);
-const part = (iso, lang, opts) => new Intl.DateTimeFormat(LOCALE[lang] || lang, { ...opts, timeZone: 'UTC' }).format(utc(iso));
+const part = (iso, lang, opts) => new Intl.DateTimeFormat(locale(), { ...opts, timeZone: 'UTC' }).format(utc(iso));
 /** "10 Sep", three letters as the design writes them. */
 const fmt = (iso, lang) => `${part(iso, lang, { day: '2-digit' })} ${part(iso, lang, { month: 'short' }).replace('.', '').slice(0, 3)}`;
 /** "Thu, 10 September 2026" */
@@ -37,11 +37,12 @@ const fmtLong = (iso, lang) => part(iso, lang, { weekday: 'short', day: '2-digit
 
 const glyph = key => (GL[key] || '') + (GL[key]?.length === 1 ? '︎' : '');
 
-/** The reading's closing sentence stands on its own line, as the design's second paragraph. */
+/** The reading's closing sentence ("Your Sun is where this lands: …") stands on its own
+    line, as the design's second paragraph. Split on the last sentence break, so it works
+    in every language. */
 function paragraphs(e) {
-  const closer = `Your ${e.natalName} is where this lands`;
-  const i = e.text.lastIndexOf(closer);
-  return i > 0 ? [e.text.slice(0, i).trim(), e.text.slice(i)] : [e.text];
+  const i = Math.max(e.text.lastIndexOf('. '), e.text.lastIndexOf('! '), e.text.lastIndexOf('? '));
+  return i > 0 ? [e.text.slice(0, i + 1).trim(), e.text.slice(i + 2)] : [e.text];
 }
 
 function Timeline({ days, today, events, day, sel, lang, onPick }) {
@@ -57,7 +58,7 @@ function Timeline({ days, today, events, day, sel, lang, onPick }) {
   });
   const cx = X(day);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }} role="img" aria-label="Transit timeline">
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }} role="img" aria-label={t('Transit timeline')}>
       <line x1={L} y1={AX} x2={R} y2={AX} stroke={INK} strokeWidth={1} pathLength={1} strokeDasharray={1} style={{ animation: 'om-draw .7s cubic-bezier(.3,0,.2,1) both' }} />
       <g style={{ animation: 'om-fade .5s ease .35s both' }}>{ticks}</g>
       {events.map((e, i) => {
@@ -79,7 +80,7 @@ function Timeline({ days, today, events, day, sel, lang, onPick }) {
       })}
       <g style={{ animation: 'om-fade .4s ease 1s both' }}>
         <line x1={X(today)} y1={14} x2={X(today)} y2={AX + 18} stroke={GOLD} strokeWidth={.7} strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
-        <text x={X(today)} y={9} fontSize={8.5} fill={GOLD} fontFamily={MONO} textAnchor="middle" letterSpacing={1}>TODAY</text>
+        <text x={X(today)} y={9} fontSize={8.5} fill={GOLD} fontFamily={MONO} textAnchor="middle" letterSpacing={1}>{t('TODAY')}</text>
       </g>
       <g style={{ transition: 'transform .12s linear', transform: `translateX(${cx}px)` }}>
         <line x1={0} y1={2} x2={0} y2={AX + 20} stroke={INK} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
@@ -159,7 +160,7 @@ export default function Transits() {
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>Plate III</span>
+          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>{t('Plate III')}</span>
           <NavMenu current="Transits" />
         </div>
       </header>
@@ -172,16 +173,16 @@ export default function Transits() {
             <section style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: COP }}>Transits to the natal chart · {fullName}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: COP }}>{t('Transits to the natal chart · {name}', { name: fullName })}</span>
                   <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(30px,7.6vw,42px)', lineHeight: 1.04 }}>{fmtLong(days[day], lang)}</h1>
                 </div>
-                <button type="button" onClick={() => setDay(TODAY)} className="hov-wash" style={{ background: 'transparent', border: '1px solid rgba(244,236,220,.4)', borderRadius: 2, padding: '8px 12px', cursor: 'pointer', color: INK, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>{day === TODAY ? 'Today' : 'Back to today'}</button>
+                <button type="button" onClick={() => setDay(TODAY)} className="hov-wash" style={{ background: 'transparent', border: '1px solid rgba(244,236,220,.4)', borderRadius: 2, padding: '8px 12px', cursor: 'pointer', color: INK, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>{day === TODAY ? t('Today') : t('Back to today')}</button>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', borderTop: `1px solid ${INK}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0 4px', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: MUTED }}>
-                  <span>Active influences · by significance</span>
-                  <span>{withOrb.length ? `${withOrb.length} within orb` : 'none within orb'}</span>
+                  <span>{t('Active influences · by significance')}</span>
+                  <span>{withOrb.length ? t('{n} within orb', { n: withOrb.length }) : t('none within orb')}</span>
                 </div>
                 {active.map(({ e, dist: d }, k) => {
                   const exact = d === 0, applying = daysUntil(e) > 0;
@@ -193,13 +194,13 @@ export default function Transits() {
                           <span style={{ fontFamily: SYM, fontSize: 15, letterSpacing: '.06em' }}>{glyph(e.transit)} {e.glyph} {glyph(e.natal)}</span>
                           <span style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.1 }}>{e.title}</span>
                         </span>
-                        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.06em', color: MUTED }}>{exact ? 'Exact today' : `${d}d ${applying ? 'before' : 'after'} exact · ${fmt(e.exactDate, lang)}`}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.06em', color: MUTED }}>{exact ? t('Exact today') : t(applying ? '{d}d before exact · {date}' : '{d}d after exact · {date}', { d, date: fmt(e.exactDate, lang) })}</span>
                       </span>
                       <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
                         <span style={{ display: 'flex', gap: 3 }}>
                           {[0, 1, 2, 3, 4].map(p => <span key={p} style={{ width: 6, height: 6, border: `1px solid ${INK}`, background: p < e.weight ? INK : 'transparent', display: 'block' }} />)}
                         </span>
-                        <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '.1em', textTransform: 'uppercase', color: exact ? GOLD : applying ? COP : MUTED }}>{exact ? 'Exact' : applying ? 'Applying' : 'Separating'}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '.1em', textTransform: 'uppercase', color: exact ? GOLD : applying ? COP : MUTED }}>{t(exact ? 'Exact' : applying ? 'Applying' : 'Separating')}</span>
                       </span>
                     </button>
                   );
@@ -213,14 +214,14 @@ export default function Transits() {
             <section style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '0 24px', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: MUTED }}>
                 <span>{fmt(days[0], lang)}</span>
-                <span style={{ color: COP }}>Drag to scrub · tap a marker</span>
+                <span style={{ color: COP }}>{t('Drag to scrub · tap a marker')}</span>
                 <span>{fmt(days[days.length - 1], lang)}</span>
               </div>
               <div style={{ position: 'relative', padding: '0 24px' }}>
                 <div style={{ position: 'relative', height: 130 }}>
                   <Timeline days={days} today={TODAY} events={events} day={day} sel={sel} lang={lang} onPick={pick} />
                 </div>
-                <input type="range" className="trt-range" min={0} max={days.length - 1} step={1} value={day} onChange={e => setDay(+e.target.value)} onInput={e => setDay(+e.target.value)} aria-label="Scrub date" style={{ position: 'absolute', left: 24, right: 24, width: 'calc(100% - 48px)', top: 56, height: 44 }} />
+                <input type="range" className="trt-range" min={0} max={days.length - 1} step={1} value={day} onChange={e => setDay(+e.target.value)} onInput={e => setDay(+e.target.value)} aria-label={t('Scrub date')} style={{ position: 'absolute', left: 24, right: 24, width: 'calc(100% - 48px)', top: 56, height: 44 }} />
               </div>
             </section>
 
@@ -229,29 +230,29 @@ export default function Transits() {
                 <article key={selected.id} style={{ border: `1px solid ${INK}`, background: 'rgba(244,236,220,.08)', display: 'flex', flexDirection: 'column', animation: 'om-rise .3s cubic-bezier(.3,0,.2,1) both' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', borderBottom: `1px solid ${INK}` }}>
                     <div style={cell}>
-                      <span style={lbl9}>Transiting</span>
+                      <span style={lbl9}>{t('Transiting')}</span>
                       <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}><span style={{ fontFamily: SYM, fontSize: 18 }}>{glyph(selected.transit)}</span><span style={{ fontFamily: SERIF, fontSize: 22 }}>{selected.transitName}</span></span>
                     </div>
                     <div style={cell}>
-                      <span style={lbl9}>Aspect</span>
+                      <span style={lbl9}>{t('Aspect')}</span>
                       <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}><span style={{ fontFamily: MONO, fontSize: 16, color: SOFT.has(selected.aspect) ? GOLD : COP }}>{selected.glyph}</span><span style={{ fontFamily: SERIF, fontSize: 22 }}>{selected.aspectName}</span></span>
                     </div>
                     <div style={{ ...cell, borderRight: 'none' }}>
-                      <span style={lbl9}>Natal point</span>
+                      <span style={lbl9}>{t('Natal point')}</span>
                       <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}><span style={{ fontFamily: SYM, fontSize: 18 }}>{glyph(selected.natal)}</span><span style={{ fontFamily: SERIF, fontSize: 22 }}>{selected.natalName}</span></span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', padding: '12px 16px', borderBottom: '1px solid rgba(244,236,220,.25)', fontFamily: MONO, fontSize: 10.5, letterSpacing: '.04em', color: INK }}>
-                    <span>Exact {fmt(selected.exactDate, lang)} {selected.exactDate.slice(0, 4)}</span>
-                    <span style={{ color: MUTED }}>In orb {fmt(days[selected.span[0]], lang)} – {fmt(days[selected.span[1]], lang)}</span>
+                    <span>{t('Exact {date} {year}', { date: fmt(selected.exactDate, lang), year: selected.exactDate.slice(0, 4) })}</span>
+                    <span style={{ color: MUTED }}>{t('In orb {from} – {to}', { from: fmt(days[selected.span[0]], lang), to: fmt(days[selected.span[1]], lang) })}</span>
                     <span style={{ color: MUTED }}>{selected.natalName} {selected.natalPos}</span>
-                    <span style={{ color: COP }}>{dist === 0 ? 'Exact on the selected day' : !inOrb ? `Out of orb on ${fmt(days[day], lang)}` : `${Math.abs(dist)}d ${dist < 0 ? 'applying' : 'separating'} on ${fmt(days[day], lang)}`}</span>
+                    <span style={{ color: COP }}>{dist === 0 ? t('Exact on the selected day') : !inOrb ? t('Out of orb on {date}', { date: fmt(days[day], lang) }) : t(dist < 0 ? '{d}d applying on {date}' : '{d}d separating on {date}', { d: Math.abs(dist), date: fmt(days[day], lang) })}</span>
                   </div>
                   <div style={{ padding: '18px 16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(22px,5.4vw,28px)', lineHeight: 1.2, textWrap: 'balance' }}>{selected.lede}</h2>
                     {paragraphs(selected).map((p, i) => <p key={i} style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, textWrap: 'pretty', maxWidth: '60ch' }}>{p}</p>)}
                     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', borderTop: '1px solid rgba(244,236,220,.22)', paddingTop: 12 }}>
-                      <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: GOLD, flex: '0 0 auto', paddingTop: 3, whiteSpace: 'nowrap' }}>To do</span>
+                      <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: GOLD, flex: '0 0 auto', paddingTop: 3, whiteSpace: 'nowrap' }}>{t('To do')}</span>
                       <span style={{ fontSize: 14, lineHeight: 1.5, color: MUTED }}>{selected.advice}</span>
                     </div>
                   </div>
@@ -261,10 +262,10 @@ export default function Transits() {
 
             <section style={{ padding: '0 24px' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', ...legendLine, borderTop: '1px solid rgba(244,236,220,.25)', paddingTop: 12 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 1, background: COP, display: 'block' }} />Hard aspect</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 1, background: GOLD, display: 'block' }} />Flowing aspect</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, border: `1px solid ${INK}`, display: 'block' }} />Outer planet · slow</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 5, height: 5, background: INK, display: 'block' }} />Inner planet · quick</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 1, background: COP, display: 'block' }} />{t('Hard aspect')}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 1, background: GOLD, display: 'block' }} />{t('Flowing aspect')}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, border: `1px solid ${INK}`, display: 'block' }} />{t('Outer planet · slow')}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 5, height: 5, background: INK, display: 'block' }} />{t('Inner planet · quick')}</span>
               </div>
             </section>
           </>

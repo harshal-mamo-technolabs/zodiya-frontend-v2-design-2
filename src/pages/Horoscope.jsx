@@ -5,6 +5,7 @@ import NavMenu from '../components/NavMenu.jsx';
 import MoodDial from '../components/MoodDial.jsx';
 import { getHoroscope, listProfiles } from '../lib/api.js';
 import { readActive } from '../lib/active-profile.js';
+import { locale, t } from '../i18n/index.js';
 
 /* A port of Daily Horoscope.dc.html, with the day toggle widened to daily, weekly and yearly.
    Every reading is computed from the real sky for the date asked, so it works on any day. */
@@ -15,7 +16,6 @@ const INK = '#F4ECDC', MUTED = 'rgba(244,236,220,.68)', COP = '#5F8B7A', GOLD = 
 const SIGNS = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
 const ABBR = { aries: 'Ari', taurus: 'Tau', gemini: 'Gem', cancer: 'Can', leo: 'Leo', virgo: 'Vir', libra: 'Lib', scorpio: 'Sco', sagittarius: 'Sag', capricorn: 'Cap', aquarius: 'Aqu', pisces: 'Pis' };
 const PERIODS = ['daily', 'weekly', 'yearly'];
-const LOCALE = { en: 'en-GB' };
 
 // Engraved glyphs drawn as stroked paths, as the design draws them.
 const GLYPH = {
@@ -38,7 +38,7 @@ const CSS = `
 `;
 
 const utc = iso => new Date(`${iso}T00:00:00Z`);
-const part = (iso, lang, opts) => new Intl.DateTimeFormat(LOCALE[lang] || lang, { ...opts, timeZone: 'UTC' }).format(utc(iso));
+const part = (iso, lang, opts) => new Intl.DateTimeFormat(locale(), { ...opts, timeZone: 'UTC' }).format(utc(iso));
 /** "Thu 17 September 2026", "14 – 20 September 2026", "The year 2026". */
 function dateLine(period, span, lang) {
   if (period === 'daily') return part(span.start, lang, { weekday: 'short', day: '2-digit', month: 'long', year: 'numeric' }).replace(',', '');
@@ -47,7 +47,7 @@ function dateLine(period, span, lang) {
     const start = sameMonth ? part(span.start, lang, { day: 'numeric' }) : part(span.start, lang, { day: 'numeric', month: 'long' });
     return `${start} – ${part(span.end, lang, { day: 'numeric', month: 'long', year: 'numeric' })}`;
   }
-  return `The year ${span.start.slice(0, 4)}`;
+  return t('The year {year}', { year: span.start.slice(0, 4) });
 }
 /** Today, in the zone the reading is for. */
 const today = zone => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -113,7 +113,7 @@ export default function Horoscope() {
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>{shown?.labels.ephemeris ?? 'Ephemeris'}</span>
+          <span className="hdr-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>{shown?.labels.ephemeris ?? t('Ephemeris')}</span>
           <NavMenu current="Daily Horoscope" />
         </div>
       </header>
@@ -122,16 +122,16 @@ export default function Horoscope() {
 
         <section style={{ padding: '20px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '0 2px 9px', borderBottom: '1px solid rgba(244,236,220,.25)' }}>
-            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED }}>{shown?.labels.selectSign ?? 'Select a sign'}</span>
+            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED }}>{shown?.labels.selectSign ?? t('Select a sign')}</span>
             <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.08em', color: COP }}>{shown ? `${shown.range} · ${shown.labels.ruledBy} ${shown.ruler}` : ''}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', borderLeft: '1px solid rgba(244,236,220,.2)', borderTop: '1px solid rgba(244,236,220,.2)' }}>
             {SIGNS.map(s => {
               const active = s === sign;
               return (
-                <button key={s} type="button" onClick={() => setSign(s)} title={s.charAt(0).toUpperCase() + s.slice(1)} aria-pressed={active} className={active ? '' : 'hor-sign'} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, aspectRatio: '1 / 1', background: active ? INK : 'transparent', border: 'none', borderRight: '1px solid rgba(244,236,220,.2)', borderBottom: '1px solid rgba(244,236,220,.2)', cursor: 'pointer', padding: '6px 2px' }}>
+                <button key={s} type="button" onClick={() => setSign(s)} title={t(s.charAt(0).toUpperCase() + s.slice(1))} aria-pressed={active} className={active ? '' : 'hor-sign'} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, aspectRatio: '1 / 1', background: active ? INK : 'transparent', border: 'none', borderRight: '1px solid rgba(244,236,220,.2)', borderBottom: '1px solid rgba(244,236,220,.2)', cursor: 'pointer', padding: '6px 2px' }}>
                   <span style={{ width: '100%', maxWidth: 30, display: 'block' }}><Glyph sign={s} active={active} /></span>
-                  <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: '.1em', textTransform: 'uppercase', color: active ? 'rgba(28,37,56,.8)' : MUTED }}>{ABBR[s]}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: '.1em', textTransform: 'uppercase', color: active ? 'rgba(28,37,56,.8)' : MUTED }}>{t(ABBR[s])}</span>
                 </button>
               );
             })}
@@ -146,7 +146,7 @@ export default function Horoscope() {
             </div>
             <div style={{ display: 'flex', border: `1px solid ${INK}` }}>
               {PERIODS.map((key, i) => (
-                <button key={key} type="button" onClick={() => setPeriod(key)} aria-pressed={period === key} style={{ background: period === key ? INK : 'transparent', color: period === key ? NAVY : INK, border: 'none', borderRight: i < PERIODS.length - 1 ? `1px solid ${INK}` : 'none', padding: '9px 12px', cursor: 'pointer', fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase' }}>{shown?.labels.periods[key] ?? key}</button>
+                <button key={key} type="button" onClick={() => setPeriod(key)} aria-pressed={period === key} style={{ background: period === key ? INK : 'transparent', color: period === key ? NAVY : INK, border: 'none', borderRight: i < PERIODS.length - 1 ? `1px solid ${INK}` : 'none', padding: '9px 12px', cursor: 'pointer', fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase' }}>{shown?.labels.periods[key] ?? t(key)}</button>
               ))}
             </div>
           </div>

@@ -4,6 +4,7 @@ import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
 import { getChart, getSharedChart, listProfiles, shareProfile } from '../lib/api.js';
 import { toChartView, SIGNS, SIGN_GLYPH } from '../lib/chart-view.js';
+import { t } from '../i18n/index.js';
 
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',Georgia,serif";
@@ -71,7 +72,7 @@ export function Wheel({ chart, name, speed = 1, showAspects = true }) {
     });
   }
   kids.push(<circle key="cd" cx={C} cy={C} r={1.6} fill={INK} style={anim('om-fade', .3, 1.3)} />);
-  return <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }} role="img" aria-label={'Natal chart wheel for ' + name}>{kids}</svg>;
+  return <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }} role="img" aria-label={t('Natal chart wheel for {name}', { name })}>{kids}</svg>;
 }
 
 function Shell({ children }) {
@@ -86,7 +87,7 @@ function Loading() {
   return (
     <Shell>
       <div style={{ width: 46, height: 46, border: '1px solid rgba(244,236,220,.3)', borderTopColor: '#F4ECDC', borderRadius: '50%', animation: 'om-turn 1.1s linear infinite' }} />
-      <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED }}>Computing your sky</span>
+      <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED }}>{t('Computing your sky')}</span>
     </Shell>
   );
 }
@@ -94,7 +95,7 @@ function Loading() {
 function Failed({ message, action }) {
   return (
     <Shell>
-      <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: GOLD }}>Could not draw the chart</span>
+      <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: GOLD }}>{t('Could not draw the chart')}</span>
       <p style={{ margin: 0, fontFamily: SERIF, fontSize: 24, maxWidth: 440, lineHeight: 1.25 }}>{message}</p>
       {action}
     </Shell>
@@ -118,7 +119,7 @@ function ChartView({ chart, shared }) {
   const copy = async url => {
     try {
       await navigator.clipboard.writeText(url);
-      flash('Link copied to clipboard');
+      flash(t('Link copied to clipboard'));
     } catch (e) {
       // clipboard is blocked on insecure origins and in some browsers
       flash(url);
@@ -132,7 +133,7 @@ function ChartView({ chart, shared }) {
     // a viewer is already on the public URL; only the owner has to mint one
     if (shared) return copy(window.location.href);
 
-    flash('Creating link…');
+    flash(t('Creating link…'));
     try {
       const { token } = await shareProfile(chart.profile.id);
       await copy(`${window.location.origin}/chart/${token}`);
@@ -148,9 +149,9 @@ function ChartView({ chart, shared }) {
   const R = b => (b && b.retro ? ' ℞' : '');
   const allOpen = secs.every(s => open[s.key]);
   const name = chart.profile.name;
-  const rows = chart.bodies.map(b => ({ body: b.name + R(b), sign: b.sign, deg: b.deg, house: String(b.house).padStart(2, '0') }));
-  rows.push({ body: 'Ascendant', sign: chart.cuspsFmt[0].sign, deg: chart.cuspsFmt[0].text, house: '01' });
-  rows.push({ body: 'Midheaven', sign: chart.cuspsFmt[9].sign, deg: chart.cuspsFmt[9].text, house: '10' });
+  const rows = chart.bodies.map(b => ({ body: t(b.name) + R(b), sign: t(b.sign), deg: b.deg, house: String(b.house).padStart(2, '0') }));
+  rows.push({ body: t('Ascendant'), sign: t(chart.cuspsFmt[0].sign), deg: chart.cuspsFmt[0].text, house: '01' });
+  rows.push({ body: t('Midheaven'), sign: t(chart.cuspsFmt[9].sign), deg: chart.cuspsFmt[9].text, house: '10' });
 
   const th = { padding: 10, fontWeight: 500, borderBottom: '1px solid rgba(244,236,220,.25)' };
   const td = { padding: '8px 10px', borderBottom: '1px solid rgba(244,236,220,.14)', whiteSpace: 'nowrap' };
@@ -166,7 +167,7 @@ function ChartView({ chart, shared }) {
 
       <header className="print-hide" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         {shared &&
-          <Link to="/signup" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>Draw your own →</Link>}
+          <Link to="/signup" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>{t('Draw your own →')}</Link>}
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
         {/* the public view has no menu; the empty box keeps the wordmark centred */}
         <div style={{ display: 'flex', alignItems: 'center', minWidth: 34 }}>
@@ -197,8 +198,8 @@ function ChartView({ chart, shared }) {
 
         <section className="print-reading" style={{ ...column, padding: '36px 24px 0', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, borderBottom: '1px solid #F4ECDC', paddingBottom: 10 }}>
-            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 26 }}>The reading</h2>
-            <button type="button" className="hov-sage print-hide" onClick={() => { const next = {}; if (!allOpen) secs.forEach(s => next[s.key] = true); setOpen(next); }} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)' }}>{allOpen ? 'Collapse all' : 'Expand all'}</button>
+            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 26 }}>{t('The reading')}</h2>
+            <button type="button" className="hov-sage print-hide" onClick={() => { const next = {}; if (!allOpen) secs.forEach(s => next[s.key] = true); setOpen(next); }} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)' }}>{allOpen ? t('Collapse all') : t('Expand all')}</button>
           </div>
           {secs.map(s => (
             <div key={s.key} style={{ borderBottom: '1px solid rgba(244,236,220,.25)' }}>
@@ -220,17 +221,17 @@ function ChartView({ chart, shared }) {
         <section className="print-table" style={{ ...column, padding: '32px 24px 0' }}>
           <div style={{ border: '1px solid rgba(244,236,220,.3)', background: 'rgba(244,236,220,.08)' }}>
             <button type="button" onClick={() => setTableOpen(v => !v)} className="hov-sage" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, width: '100%', background: 'transparent', border: 'none', padding: '15px 16px', cursor: 'pointer', textAlign: 'left', color: '#F4ECDC', fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase' }}>
-              <span>{'Exact placements · Tropical · ' + chart.meta.houseSystem}</span>
+              <span>{t('Exact placements · Tropical · {system}', { system: t(chart.meta.houseSystem) })}</span>
               <span className="print-hide" style={{ fontSize: 14, color: MUTED }}>{tableOpen ? '−' : '+'}</span>
             </button>
             <div className="table-body" style={{ display: tableOpen ? 'block' : 'none', overflowX: 'auto', borderTop: '1px solid rgba(244,236,220,.3)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: MONO, fontSize: 12, minWidth: 340 }}>
                 <thead>
                   <tr style={{ textAlign: 'left', color: MUTED, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase' }}>
-                    <th style={{ ...th, padding: '10px 10px 8px 16px' }}>Body</th>
-                    <th style={th}>Sign</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Degree</th>
-                    <th style={{ ...th, padding: '10px 16px 8px 10px', textAlign: 'right' }}>House</th>
+                    <th style={{ ...th, padding: '10px 10px 8px 16px' }}>{t('Body')}</th>
+                    <th style={th}>{t('Sign')}</th>
+                    <th style={{ ...th, textAlign: 'right' }}>{t('Degree')}</th>
+                    <th style={{ ...th, padding: '10px 16px 8px 10px', textAlign: 'right' }}>{t('House')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -245,7 +246,7 @@ function ChartView({ chart, shared }) {
                 </tbody>
               </table>
               <div style={{ padding: '11px 16px 13px', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED, borderTop: '1px solid rgba(244,236,220,.25)' }}>
-                ℞ = retrograde: from Earth the planet looked like it was moving backwards when you were born, which turns its themes inward rather than outward. Positions computed server-side to arc-minute precision.
+                {t('℞ = retrograde: from Earth the planet looked like it was moving backwards when you were born, which turns its themes inward rather than outward. Positions computed server-side to arc-minute precision.')}
               </div>
             </div>
           </div>
@@ -254,19 +255,19 @@ function ChartView({ chart, shared }) {
         <section className="print-hide" style={{ ...column, padding: '28px 24px 0' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             <button type="button" onClick={share} className="hov-cream" style={{ ...actionBtn, background: '#F4ECDC', color: '#1C2538', border: 'none' }}>
-              <span>{shared ? 'Copy this link' : 'Share this chart'}</span>
+              <span>{shared ? t('Copy this link') : t('Share this chart')}</span>
               <span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>↗</span>
             </button>
             <button type="button" onClick={download} className="hov-wash-cream" style={{ ...actionBtn, background: 'transparent', color: '#F4ECDC', border: '1px solid #F4ECDC' }}>
-              <span>Download as plate</span>
+              <span>{t('Download as plate')}</span>
               <span style={{ fontFamily: MONO, fontSize: 13, color: MUTED }}>PDF</span>
             </button>
           </div>
           <div aria-live="polite" style={{ minHeight: 20, marginTop: 10, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: COP, wordBreak: 'break-all' }}>{notice}</div>
           <p style={{ margin: '2px 0 0', fontSize: 12.5, lineHeight: 1.5, color: MUTED, maxWidth: 560 }}>
             {shared
-              ? 'Anyone with this link can read this chart.'
-              : 'Sharing creates a link that works without logging in. It shows the name, date and city, but not the exact birthplace. You can turn it off again at any time.'}
+              ? t('Anyone with this link can read this chart.')
+              : t('Sharing creates a link that works without logging in. It shows the name, date and city, but not the exact birthplace. You can turn it off again at any time.')}
           </p>
         </section>
       </main>
@@ -301,7 +302,7 @@ export default function NatalChart() {
     return () => { live = false; };
   }, [navigate]);
 
-  if (error) return <Failed message={error} action={<Link to="/birth-details" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Check your birth details</Link>} />;
+  if (error) return <Failed message={error} action={<Link to="/birth-details" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>{t('Check your birth details')}</Link>} />;
   if (!chart) return <Loading />;
   return <ChartView chart={chart} shared={false} />;
 }
@@ -320,7 +321,7 @@ export function SharedChart() {
     return () => { live = false; };
   }, [token]);
 
-  if (error) return <Failed message={error} action={<Link to="/signup" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Draw your own chart</Link>} />;
+  if (error) return <Failed message={error} action={<Link to="/signup" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>{t('Draw your own chart')}</Link>} />;
   if (!chart) return <Loading />;
   return <ChartView chart={chart} shared />;
 }

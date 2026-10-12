@@ -30,7 +30,9 @@ export const READINGS = {
   horoscope: ["Today's horoscope", '/daily-horoscope'],
   numerology: ['Your numbers', '/numerology'],
   synastry: ['Compatibility', '/synastry'],
-  tarot: ['Tarot', '/tarot']
+  tarot: ['Tarot', '/tarot'],
+  astrocartography: ['Astrocartography', '/astrocartography'],
+  palm: ['Palm reading', '/palm-reading']
 };
 
 const KEY = 'meridian_astrologer';
