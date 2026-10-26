@@ -11,11 +11,8 @@ RUN npm ci
 # Copy the rest of the app source
 COPY . .
 
-# Build the React app; Vite bakes VITE_API_URL into the bundle
-ARG VITE_API_URL
-# optional: without it the support page has no chat
-ARG VITE_HELPSCOUT_BEACON_ID
-RUN test -n "$VITE_API_URL" && npm run build
+# Build the React app
+RUN npm run build
 
 # Production stage with nginx
 FROM nginx:alpine
@@ -23,8 +20,8 @@ FROM nginx:alpine
 # Copy built app from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY ./conf/nginx/default.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configuration as a template: the image fills ${API_UPSTREAM} at start
+COPY ./conf/nginx/default.conf /etc/nginx/templates/default.conf.template
 
 # Create necessary directories and set permissions
 RUN mkdir -p /var/log/nginx && \
@@ -34,4 +31,5 @@ RUN mkdir -p /var/log/nginx && \
 EXPOSE 5054
 
 CMD ["nginx", "-g", "daemon off;"]
+
 
