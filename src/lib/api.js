@@ -1,5 +1,5 @@
-/* Production builds call the API subdomain set in VITE_API_URL (.env). In dev
-   it is unset and calls go through Vite's /api proxy. */
+/* Production builds call the API subdomain set in VITE_API_URL (.env.production).
+   In dev it is unset and calls go through Vite's /api proxy. */
 import { getLang, t } from '../i18n/index.js';
 
 const BASE = import.meta.env.VITE_API_URL || '/api';
