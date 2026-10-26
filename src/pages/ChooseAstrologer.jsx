@@ -4,7 +4,7 @@ import '../lib/mrd-astro.js';
 import NavMenu from '../components/NavMenu.jsx';
 import { astrologerPreview, getMe } from '../lib/api.js';
 import { CHARACTERS, SPEED, byId, getPrefs, setPrefs } from '../lib/astrologers.js';
-import { euros, forgetStatus, getCatalog, getStatus, useSales } from '../lib/billing.js';
+import { money, forgetStatus, getCatalog, getStatus, useSales } from '../lib/billing.js';
 import { getLang, t } from '../i18n/index.js';
 
 const MONO = "'IBM Plex Mono',monospace";
@@ -138,7 +138,7 @@ export default function ChooseAstrologer() {
               {packs.map(p => (
                 <Link key={p.id} to={`/checkout?item=minutes&pack=${p.id}&qty=1&next=${encodeURIComponent('/choose-astrologer')}`} style={{ display: 'flex', alignItems: 'baseline', gap: 8, minHeight: 40, padding: '9px 14px', borderRadius: 999, border: '1px solid rgba(216,188,106,.45)', color: '#F4ECDC', borderBottom: '1px solid rgba(216,188,106,.45)' }}>
                   <span style={{ fontFamily: SERIF, fontSize: 17 }}>+{p.minutes} min</span>
-                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: GOLD }}>{euros(p.amount)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: GOLD }}>{money(p.amount)}</span>
                 </Link>
               ))}
             </div>

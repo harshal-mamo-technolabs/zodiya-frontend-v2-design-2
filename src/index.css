@@ -53,56 +53,6 @@ input:focus { outline: none; }
 .astro-chip:hover { background: rgba(212,178,106,.14) !important; }
 .astro-focus:focus-visible { outline: 2px solid #EBD39A; outline-offset: 2px; }
 
-/* ── Print: "Download as plate" is window.print(), so this IS the PDF ──
-   The page uses inline styles throughout, which beat stylesheet rules — hence
-   !important on anything that has to be overridden for paper. */
-@media print {
-  @page { margin: 12mm; }
-
-  html, body { background: #fff !important; }
-
-  /* the page root paints the ink ground inline; paper needs white under the
-     dark ink text, or pages two onward come out invisible */
-  .chart-root {
-    background: #fff !important;
-    color: #1C2538 !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-  }
-
-  /* decorative layers and anything you cannot click on paper */
-  .starfield-layer, .print-hide { display: none !important; }
-
-  /* a half-finished draw animation would be frozen into the PDF */
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-
-  /* collapsibles open on paper no matter what the reader left open on screen */
-  .reading-body { display: flex !important; }
-  .table-body { display: block !important; overflow: visible !important; }
-
-  /* page one: the plate keeps the ink ground and bleeds to the sheet edge */
-  .print-plate {
-    background: #1C2538 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    break-after: page;
-    padding: 8mm 10mm 14mm !important;
-    margin: -12mm -12mm 0 !important;
-  }
-
-  /* the reading and the placements print as ink on white */
-  .print-reading, .print-reading *,
-  .print-table, .print-table * {
-    color: #1C2538 !important;
-    background: transparent !important;
-    border-color: rgba(28, 37, 56, .28) !important;
-  }
-  .print-reading { padding-top: 0 !important; }
-  .print-reading .reading-basis { border-left-color: #B4933F !important; }
-  .print-reading > div, .print-table tr { break-inside: avoid; }
-  .print-table { break-inside: avoid; }
-}
-
 /* Choose astrologer: a snap carousel on phones, a grid from tablet up */
 .ca-shell { container-type: inline-size; width: 100%; }
 .ca-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 14px; padding: 6px 22px 18px; scrollbar-width: none; }
@@ -152,21 +102,26 @@ input:focus { outline: none; }
 .nm-dial-wrap:hover .nm-dial, .nm-dial-wrap:focus-within .nm-dial { opacity: 1; filter: drop-shadow(0 0 4px rgba(216,188,106,.85)); }
 @media (prefers-reduced-motion: reduce) { .nm-dial { animation: none; } }
 
-/* Palm reading: one column on phones; sticky camera beside the report from tablet up */
+/* Palm reading: one column on phones; the photo beside its guide or its report from tablet up */
 @keyframes om-breathe { 0%, 100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.03); opacity: .95; } }
 .pr-shell { container-type: inline-size; width: 100%; }
-.pr-cols { grid-template-columns: minmax(0,1fr); grid-template-areas: "hero" "cam" "report" "foot"; }
+.pr-flow, .pr-report, .pr-mounts, .pr-overall, .pr-history { grid-template-columns: minmax(0,1fr); }
 .pr-link:hover:not(:disabled), .pr-hand[aria-pressed="false"]:hover:not(:disabled) { color: #F4ECDC !important; }
 .pr-outline:hover:not(:disabled), .pr-shutter:hover, .pr-pick[aria-checked="false"]:hover { border-color: #F4ECDC !important; }
+.pr-primary:hover:not(:disabled) { filter: brightness(1.08); }
 .pr-shutter:active > span { transform: scale(.9); }
 .pr-link:disabled, .pr-hand:disabled { opacity: .45; cursor: default !important; }
-@container (min-width: 820px) {
-  .pr-cols { max-width: 1120px !important; padding: 54px 48px 80px !important; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); column-gap: 64px !important; row-gap: 56px !important; grid-template-areas: "hero hero" "cam report" "foot foot"; }
-  .pr-hero h1 { font-size: 64px !important; }
-  .pr-hero { flex-direction: row !important; align-items: flex-end !important; justify-content: space-between !important; gap: 48px !important; }
-  .pr-cam { position: sticky; top: 44px; align-self: start; }
+@container (min-width: 600px) {
+  .pr-mounts, .pr-overall, .pr-history { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
-@container (min-width: 1240px) { .pr-hero h1 { font-size: 76px !important; } }
+@container (min-width: 860px) {
+  .pr-main { padding: 54px 48px 80px !important; gap: 56px !important; }
+  .pr-hero h1 { font-size: 60px !important; }
+  .pr-title { font-size: 54px !important; }
+  .pr-flow { grid-template-columns: minmax(0,440px) minmax(0,1fr); column-gap: 64px !important; align-items: start; }
+  .pr-report { grid-template-columns: minmax(0,360px) minmax(0,1fr); column-gap: 56px !important; align-items: start; }
+  .pr-aside { position: sticky; top: 32px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .pr-breathe { animation: none !important; opacity: .7; }
 }

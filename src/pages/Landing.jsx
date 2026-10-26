@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import { getStats } from '../lib/api.js';
-import { useSales } from '../lib/billing.js';
+import { fromPrices, getCatalog, useSales } from '../lib/billing.js';
 import LanguageSwitch from '../components/LanguageSwitch.jsx';
 import { locale, t } from '../i18n/index.js';
 
@@ -94,6 +94,8 @@ function SampleWheel() {
 
 export default function Landing() {
   const sales = useSales();
+  const [from, setFrom] = useState(null);
+  useEffect(() => { getCatalog().then(c => setFrom(fromPrices(c))).catch(() => {}); }, []);
   const [charts, setCharts] = useState(null);
   useEffect(() => { getStats().then(s => setCharts(s.charts)).catch(() => {}); }, []);
 
@@ -117,10 +119,10 @@ export default function Landing() {
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto' }}>
 
         <section style={{ padding: '44px 24px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 20 }}>
-          {sales && (
+          {sales && from && (
           <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: COP, display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ display: 'block', width: 28, height: 1, background: COP }} />
-            <span>{t('Plans from €10 · Try 3 days for €3')}</span>
+            <span>{from.trial ? t('Plans from {price} · Try {days} days for {trial}', from) : t('Plans from {price}', from)}</span>
             <span style={{ display: 'block', width: 28, height: 1, background: COP }} />
           </div>
           )}
@@ -201,6 +203,10 @@ export default function Landing() {
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '8px 20px', borderTop: '1px solid rgba(28,37,56,.2)', paddingTop: 16, fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(28,37,56,.6)' }}>
             <span>© MMXXVI AstroMeridian</span>
+            <span style={{ display: 'flex', gap: 20 }}>
+              <Link to="/privacy" style={{ color: 'inherit', borderBottom: 'none' }}>{t('Privacy Policy')}</Link>
+              <Link to="/terms" style={{ color: 'inherit', borderBottom: 'none' }}>{t('Terms of Use')}</Link>
+            </span>
             <span>{t('For reflection, not prediction')}</span>
           </div>
         </div>

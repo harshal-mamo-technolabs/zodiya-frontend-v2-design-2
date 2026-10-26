@@ -81,7 +81,8 @@ export default {
     '℞ = rückläufig: Von der Erde aus schien sich der Planet bei deiner Geburt rückwärts zu bewegen, was seine Themen eher nach innen als nach außen lenkt. Positionen serverseitig auf die Bogenminute genau berechnet.',
   'Copy this link': 'Diesen Link kopieren',
   'Share this chart': 'Dieses Horoskop teilen',
-  'Download as plate': 'Als Tafel herunterladen',
+  'Download PDF': 'PDF herunterladen',
+  "The chart couldn't be downloaded. Try again in a moment.": 'Das Horoskop konnte nicht heruntergeladen werden. Versuch es gleich noch einmal.',
   'Anyone with this link can read this chart.': 'Jeder mit diesem Link kann dieses Horoskop lesen.',
   'Sharing creates a link that works without logging in. It shows the name, date and city, but not the exact birthplace. You can turn it off again at any time.':
     'Beim Teilen entsteht ein Link, der ohne Anmeldung funktioniert. Er zeigt Name, Datum und Stadt, aber nicht den genauen Geburtsort. Du kannst ihn jederzeit wieder deaktivieren.',

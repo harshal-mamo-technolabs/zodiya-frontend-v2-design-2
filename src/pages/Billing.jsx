@@ -3,10 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
 import { cancelPlan, getCard, listReceipts, listProfiles, resumePlan } from '../lib/api.js';
-import { EDIT_LIMITS, editsText, euros, every, forgetStatus, getCatalog, getStatus, longDate, packName } from '../lib/billing.js';
+import { EDIT_LIMITS, editsText, money, every, forgetStatus, getCatalog, getStatus, longDate, packName, palmReadings, readingsLeft } from '../lib/billing.js';
 import { getLang, t } from '../i18n/index.js';
 
-/* Plan, minutes, profiles, card and receipts, and a way to change each. */
+/* Plan, minutes, palm readings, profiles, card and receipts, and a way to change each. */
 
 const MONO = "'IBM Plex Mono',monospace";
 const SERIF = "'Cormorant Garamond',Georgia,serif";
@@ -66,6 +66,8 @@ export default function Billing() {
   const tier = plan && catalog && catalog.plans.find(p => p.tier === plan.tier);
   const failed = plan && (plan.status === 'past_due' || plan.status === 'unpaid');
   const allowance = plan && catalog ? (plan.trial ? catalog.trial.minutes : tier ? tier.minutes : 0) * 60 : 0;
+  const palm = status && status.palm; // absent until the API counts palm readings
+  const palmAllowance = plan && catalog ? (plan.trial ? catalog.trial.palm : tier && tier.palm) || 0 : 0;
 
   return (
     <div style={{ minHeight: '100vh', background: NAVY, color: INK, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', fontFamily: "'Instrument Sans',Helvetica,Arial,sans-serif" }}>
@@ -93,8 +95,9 @@ export default function Billing() {
               {[
                 ['membership', t('01 · Membership'), tier && status.entitled ? (plan.trial ? t('{plan} trial', { plan: tier.name }) : tier.name) : t('No plan'), planLine(plan) || t('Choose a plan to start')],
                 ['astrologer', t('02 · AI astrologer'), t('{n} min left', { n: mins(status.minutes.total) }), t('{plan} plan · {topup} top-up', { plan: mins(status.minutes.plan), topup: mins(status.minutes.topup) })],
-                ['profiles', t('03 · Profiles'), t('{used} of {total} slots', { used: status.profiles.used, total: status.profiles.included + status.profiles.extra }), status.profiles.pack ? t('{pack} pack', { pack: packName(catalog.profilePacks.find(x => x.id === status.profiles.pack)) }) : t('Your own profile only')]
-              ].map(([id, label, value, note]) => (
+                palm && ['palm', t('03 · Palm readings'), readingsLeft(palm.total), t('{plan} from plan · {topup} bought', { plan: palm.plan, topup: palm.topup })],
+                ['profiles', t('04 · Profiles'), t('{used} of {total} slots', { used: status.profiles.used, total: status.profiles.included + status.profiles.extra }), status.profiles.pack ? t('{pack} pack', { pack: packName(catalog.profilePacks.find(x => x.id === status.profiles.pack)) }) : t('Your own profile only')]
+              ].filter(Boolean).map(([id, label, value, note]) => (
                 <button key={id} type="button" onClick={() => document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' })} className="bl-line" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: '16px 16px 14px', border: '1px solid rgba(244,236,220,.22)', background: 'rgba(17,23,37,.55)', color: INK, textAlign: 'left', cursor: 'pointer', font: 'inherit' }}>
                   <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>{label}</span>
                   <span style={{ fontFamily: SERIF, fontSize: 26, lineHeight: 1.05 }}>{value}</span>
@@ -114,7 +117,7 @@ export default function Billing() {
               {tier && status.entitled ? (
                 <div style={row}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <span style={{ fontSize: 15 }}>{tier.name} · {euros(tier.amount)} {every(tier.months)}</span>
+                    <span style={{ fontSize: 15 }}>{tier.name} · {money(tier.amount)} {every(tier.months)}</span>
                     <span style={mono10}>{plan.trial ? t('{minutes} astrologer minutes during the trial', { minutes: catalog.trial.minutes }) : t('{minutes} astrologer minutes {every}', { minutes: tier.minutes, every: every(tier.months) })}</span>
                   </div>
                   <Link to="/subscription" className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{t('Change plan')}</Link>
@@ -170,13 +173,45 @@ export default function Billing() {
                       <Link key={p.id} to={`/checkout?item=minutes&pack=${p.id}&qty=1`} className="bl-line" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '12px 6px 10px', border: '1px solid rgba(180,147,63,.45)', background: 'rgba(180,147,63,.06)', color: INK, borderBottom: '1px solid rgba(180,147,63,.45)', textAlign: 'center' }}>
                         <span style={{ fontFamily: SERIF, fontSize: 28, lineHeight: 1 }}>+{p.minutes}</span>
                         <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>min</span>
-                        <span style={{ fontFamily: MONO, fontSize: 12, color: GOLD, marginTop: 4 }}>{euros(p.amount)}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 12, color: GOLD, marginTop: 4 }}>{money(p.amount)}</span>
                       </Link>
                     ))}
                   </div>
                 </div>
               )}
             </Card>
+
+            {/* ---------------------------------------------- palm readings */}
+            {palm && (
+              <Card id="palm" n="03" title={t('Palm readings')} delay={0.12} status={<span style={mono10}>{readingsLeft(palm.total)}</span>}>
+                <div style={{ ...row, flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14.5 }}>
+                    <span>{t('From your plan')}</span><span style={{ fontFamily: MONO }}>{t('{n} of {total}', { n: palm.plan, total: palmAllowance })}</span>
+                  </div>
+                  <div aria-hidden="true" style={{ height: 3, background: 'rgba(244,236,220,.14)' }}>
+                    <div style={{ height: '100%', width: `${palmAllowance ? Math.min(100, (palm.plan / palmAllowance) * 100) : 0}%`, background: GOLD, transition: 'width .4s ease' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14.5 }}>
+                    <span>{t('Bought')}</span><span style={{ fontFamily: MONO }}>{palm.topup}</span>
+                  </div>
+                  <span style={mono10}>{t('Plan readings reset at each renewal and are used first. A photo that cannot be read costs nothing.')}</span>
+                </div>
+                {status.entitled && (catalog.palmPacks || []).length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 16 }}>
+                    <span style={{ ...mono10, textTransform: 'uppercase', letterSpacing: '.14em' }}>{t('Buy more')}</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }}>
+                      {catalog.palmPacks.map(p => (
+                        <Link key={p.id} to={`/checkout?item=palm&pack=${p.id}&qty=1&next=/billing`} aria-label={`${palmReadings(p.readings)} · ${money(p.amount)}`} className="bl-line" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '12px 6px 10px', border: '1px solid rgba(180,147,63,.45)', background: 'rgba(180,147,63,.06)', color: INK, borderBottom: '1px solid rgba(180,147,63,.45)', textAlign: 'center' }}>
+                          <span style={{ fontFamily: SERIF, fontSize: 28, lineHeight: 1 }}>+{p.readings}</span>
+                          <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: MUTED }}>{t('readings')}</span>
+                          <span style={{ fontFamily: MONO, fontSize: 12, color: GOLD, marginTop: 4 }}>{money(p.amount)}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
 
             {/* -------------------------------------------------- profiles */}
             <ProfilesSection status={status} catalog={catalog} people={people} />
@@ -201,7 +236,7 @@ export default function Billing() {
                     <span style={{ fontSize: 14.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</span>
                     <span style={mono10}>{longDate(r.created)}{r.refunded ? ` · ${t('refunded')}` : ''}</span>
                   </div>
-                  <span style={{ fontFamily: MONO, fontSize: 13 }}>{euros(r.amount)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 13 }}>{money(r.amount, r.currency)}</span>
                   {/* Stripe's own receipt page for this payment, nothing else */}
                   {r.receiptUrl && <a href={r.receiptUrl} target="_blank" rel="noreferrer" style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '.12em', textTransform: 'uppercase', color: GOLD, borderBottom: 'none', whiteSpace: 'nowrap' }}>{t('Receipt ↗')}</a>}
                 </div>
@@ -234,12 +269,12 @@ function ProfilesSection({ status, catalog, people }) {
   const sub = { fontSize: 12.5, lineHeight: 1.55, color: MUTED, textWrap: 'pretty' };
 
   return (
-    <Card id="profiles" n="03" title={t('Profiles')} delay={0.15} status={<span style={mono10}>{t('{used} of {total} slots used', { used: p.used, total: slots })}</span>}>
+    <Card id="profiles" n="04" title={t('Profiles')} delay={0.15} status={<span style={mono10}>{t('{used} of {total} slots used', { used: p.used, total: slots })}</span>}>
 
       {/* the pack you pay for */}
       <div style={row}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ fontSize: 14.5 }}>{current ? t('{pack} pack · {price} a month', { pack: packName(current), price: euros(current.amount) }) : t('No profile pack')}</span>
+          <span style={{ fontSize: 14.5 }}>{current ? t('{pack} pack · {price} a month', { pack: packName(current), price: money(current.amount) }) : t('No profile pack')}</span>
           <span style={mono10}>{current ? t('Room for {n} profiles, your own included', { n: slots }) : t('Your own profile is included with your plan')}</span>
         </div>
       </div>
@@ -274,7 +309,7 @@ function ProfilesSection({ status, catalog, people }) {
         return (
           <div key={pack.id} style={row}>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 14.5 }}>{t('{pack} · {price} a month', { pack: packName(pack), price: euros(pack.amount) })}</span>
+              <span style={{ fontSize: 14.5 }}>{t('{pack} · {price} a month', { pack: packName(pack), price: money(pack.amount) })}</span>
               <span style={mono10}>{mine ? t('Your pack') : !fits ? t('Holds {n} profiles; you have {used}', { n: p.included + pack.extra, used: p.used }) : current ? t(up ? 'Charged the difference today, pro rata' : 'Credited the difference today, pro rata') : t('Room for {n} profiles', { n: p.included + pack.extra })}</span>
             </div>
             {mine ? <span style={{ ...mono10, color: SAGE }}>{t('Current')}</span>

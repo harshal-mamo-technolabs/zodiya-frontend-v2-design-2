@@ -4,7 +4,7 @@ import { avatarImage } from '../lib/assets.js';
 import { listProfiles, logout } from '../lib/api.js';
 import { clearActive, readActive, writeActive } from '../lib/active-profile.js';
 import ProfileForm from './ProfileForm.jsx';
-import { euros, forgetStatus, getCatalog, getStatus, packName, useSales } from '../lib/billing.js';
+import { money, forgetStatus, getCatalog, getStatus, packName, useSales } from '../lib/billing.js';
 import { t } from '../i18n/index.js';
 import LanguageSwitch from './LanguageSwitch.jsx';
 
@@ -15,7 +15,8 @@ const TOP = [['Home', '/dashboard', '⌂'], ['Daily Horoscope', '/daily-horoscop
 const GROUPS = [
   { label: 'Your chart', glyph: '☉', items: [['Birth Details', '/birth-details'], ['Natal Chart', '/natal-chart'], ['Transits', '/transits'], ['Astrocartography', '/astrocartography']] },
   { label: 'Practices', glyph: '✦', items: [['Synastry', '/synastry'], ['Tarot', '/tarot'], ['Numerology', '/numerology'], ['Palm Reading', '/palm-reading']] },
-  { label: 'You', glyph: '◐', items: [['Your astrologer', '/choose-astrologer'], ['Plan & billing', '/billing'], ['Account', '/account'], ['Help & support', '/support']] }
+  { label: 'You', glyph: '◐', items: [['Your astrologer', '/choose-astrologer'], ['Plan & billing', '/billing'], ['Account', '/account'], ['Help & support', '/support']] },
+  { label: 'Legal & FAQ', glyph: '§', items: [['FAQ', '/faq'], ['Privacy Policy', '/privacy'], ['Terms of Use', '/terms'], ['Refund Policy', '/refund']] }
 ];
 const NEW = ['Astrocartography', 'Palm Reading'];
 const SYM = "'Noto Sans Symbols','Segoe UI Symbol','Apple Symbols',serif";
@@ -76,7 +77,7 @@ export function AddProfile({ onClose }) {
             {bigger.length === 0 && packs.length > 0 && <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'rgba(244,236,220,.68)' }}>{t('You already have the largest pack and every slot is taken. Switched-off people keep their slot.')}</p>}
             {bigger.map(p => (
               <button key={p.id} type="button" onClick={() => { onClose(); navigate(`/checkout?item=profiles&pack=${p.id}&next=${encodeURIComponent('/account?add=1')}`); }} className="hov-cream" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 50, padding: '0 16px 0 18px', background: '#F4ECDC', color: '#1C2538', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 15 }}>
-                <span>{t('{pack} · {price}/month', { pack: packName(p), price: euros(p.amount) })}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
+                <span>{t('{pack} · {price}/month', { pack: packName(p), price: money(p.amount) })}</span><span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
               </button>
             ))}
           </div>

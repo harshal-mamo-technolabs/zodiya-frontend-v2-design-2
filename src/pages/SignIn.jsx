@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import { login as apiLogin, register as apiRegister } from '../lib/api.js';
+import { fromPrices, getCatalog } from '../lib/billing.js';
 import LanguageSwitch from '../components/LanguageSwitch.jsx';
 import { t } from '../i18n/index.js';
 
@@ -25,6 +26,8 @@ export default function SignIn({ mode }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [from, setFrom] = useState(null);
+  useEffect(() => { if (mode === 'signup') getCatalog().then(c => setFrom(c.paymentsEnabled === false ? null : fromPrices(c))).catch(() => {}); }, [mode]);
   const [error, setError] = useState('');
   const login = mode === 'login', signup = mode === 'signup';
 
@@ -139,7 +142,7 @@ export default function SignIn({ mode }) {
 
             {signup && (
               <div style={{ borderTop: '1px solid rgba(28,37,56,.25)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span style={{ ...label, color: '#5F8B7A' }}>{t('Next, pick a plan · from €3 for a 3-day trial')}</span>
+                <span style={{ ...label, color: '#5F8B7A' }}>{from && from.trial ? t('Next, pick a plan · from {trial} for a {days}-day trial', from) : t('Next, pick a plan')}</span>
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13.5, lineHeight: 1.45, color: '#1C2538' }}>
                   {['Your natal wheel, saved and re-drawable', 'A daily horoscope written for your chart', 'Exact placement table and life path number'].map(x => (
                     <li key={x} style={{ display: 'flex', gap: 9 }}><span style={{ fontFamily: MONO, color: '#5F8B7A' }}>✓</span><span>{t(x)}</span></li>

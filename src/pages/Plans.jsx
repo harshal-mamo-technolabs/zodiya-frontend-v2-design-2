@@ -4,7 +4,7 @@ import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
 import { logout } from '../lib/api.js';
 import { clearActive } from '../lib/active-profile.js';
-import { cadence, euros, every, getCatalog, getStatus, minutesText } from '../lib/billing.js';
+import { cadence, money, every, getCatalog, getStatus, minutesText, palmReadings } from '../lib/billing.js';
 import { t } from '../i18n/index.js';
 
 /* Pricing. Every plan opens the whole app; they differ only in how long a
@@ -100,23 +100,29 @@ export default function Plans() {
               const mine = current && status.entitled && current.tier === p.tier;
               const isTrialPlan = p.tier === catalog.trial.tier;
               const canTrial = isTrialPlan && (status === null || (status.trialAvailable && !status.entitled));
-              const featured = p.tier === 'premium';
+              const featured = p.featured;
               return (
                 <article key={p.tier} className="pl-card" style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16, padding: '24px 22px 22px', border: `1px solid ${mine || featured ? GOLD : 'rgba(244,236,220,.25)'}`, background: 'rgba(28,37,56,.72)', transition: 'border-color .2s ease', animation: `om-rise .5s cubic-bezier(.3,0,.2,1) ${0.08 + i * 0.06}s both` }}>
                   {(mine || featured) && <span style={{ position: 'absolute', top: -9, left: 20, background: NAVY, padding: '0 8px', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD }}>{mine ? t('Current plan') : t('Most chosen')}</span>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 30 }}>{p.name}</h2>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                      <span style={{ fontFamily: SERIF, fontSize: 44, lineHeight: 1 }}>{euros(p.amount)}</span>
+                      <span style={{ fontFamily: SERIF, fontSize: 44, lineHeight: 1 }}>{money(p.amount)}</span>
                       <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.06em', color: MUTED }}>{every(p.months)}</span>
                     </div>
-                    <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.06em', color: p.months > 1 ? SAGE : 'transparent' }}>{p.months > 1 ? t('{price} a month', { price: euros(Math.round(p.amount / p.months)) }) : '·'}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.06em', color: p.months > 1 ? SAGE : 'transparent' }}>{p.months > 1 ? t('{price} a month', { price: money(Math.round(p.amount / p.months)) }) : '·'}</span>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '12px 0', borderTop: '1px solid rgba(244,236,220,.18)', borderBottom: '1px solid rgba(244,236,220,.18)' }}>
                     <span style={{ fontSize: 14.5 }}>{t('Astrologer minutes')}</span>
                     <span style={{ fontFamily: MONO, fontSize: 13, color: GOLD }}>{p.minutes} / {cadence(p.months)}</span>
                   </div>
+                  {p.palm != null && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '12px 0', marginTop: -16, borderBottom: '1px solid rgba(244,236,220,.18)' }}>
+                      <span style={{ fontSize: 14.5 }}>{t('Palm readings')}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 13, color: GOLD }}>{p.palm} / {cadence(p.months)}</span>
+                    </div>
+                  )}
 
                   <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
                     {INCLUDED.map(x => <li key={x} style={{ display: 'flex', gap: 9, fontSize: 14, lineHeight: 1.45 }}><span style={{ fontFamily: MONO, color: SAGE }}>✓</span><span>{t(x)}</span></li>)}
@@ -125,12 +131,14 @@ export default function Plans() {
                   {canTrial && (
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', border: `1px solid ${trial ? 'rgba(180,147,63,.6)' : 'rgba(244,236,220,.2)'}`, cursor: 'pointer', fontSize: 13.5, lineHeight: 1.45 }}>
                       <input type="checkbox" checked={trial} onChange={e => setTrial(e.target.checked)} style={{ accentColor: GOLD, marginTop: 3 }} />
-                      <span>{t('Start with a {days}-day trial for {price} and {minutes} minutes. {plan} begins after, unless you cancel.', { days: catalog.trial.days, price: euros(catalog.trial.amount), minutes: catalog.trial.minutes, plan: p.name })}</span>
+                      <span>{catalog.trial.palm != null
+                        ? t('Start with a {days}-day trial for {price}, {minutes} minutes and {readings}. {plan} begins after, unless you cancel.', { days: catalog.trial.days, price: money(catalog.trial.amount), minutes: catalog.trial.minutes, readings: palmReadings(catalog.trial.palm), plan: p.name })
+                        : t('Start with a {days}-day trial for {price} and {minutes} minutes. {plan} begins after, unless you cancel.', { days: catalog.trial.days, price: money(catalog.trial.amount), minutes: catalog.trial.minutes, plan: p.name })}</span>
                     </label>
                   )}
 
                   <button type="button" disabled={!!mine} onClick={() => choose(p.tier)} className={mine ? '' : 'hov-cream'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 50, padding: '0 16px 0 18px', background: mine ? 'transparent' : INK, color: mine ? MUTED : NAVY, border: mine ? '1px solid rgba(244,236,220,.25)' : 'none', borderRadius: 2, cursor: mine ? 'default' : 'pointer', fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 15 }}>
-                    <span>{mine ? t('Your plan') : status && status.entitled ? t('Switch to {plan}', { plan: p.name }) : canTrial && trial ? t('Try for {price}', { price: euros(catalog.trial.amount) }) : t('Choose {plan}', { plan: p.name })}</span>
+                    <span>{mine ? t('Your plan') : status && status.entitled ? t('Switch to {plan}', { plan: p.name }) : canTrial && trial ? t('Try for {price}', { price: money(catalog.trial.amount) }) : t('Choose {plan}', { plan: p.name })}</span>
                     {!mine && <span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>}
                   </button>
                 </article>
@@ -144,12 +152,12 @@ export default function Plans() {
           <section style={{ display: 'grid', gap: 18, gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', animation: 'om-rise .5s cubic-bezier(.3,0,.2,1) .3s both' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 14, borderTop: `1px solid ${INK}` }}>
               <span style={eyebrow}>{t('More people')}</span>
-              <span style={{ fontFamily: SERIF, fontSize: 22 }}>{catalog.profilePacks.map(p => t('{n} extra {price}', { n: p.extra, price: euros(p.amount) })).join(' · ')}</span>
+              <span style={{ fontFamily: SERIF, fontSize: 22 }}>{catalog.profilePacks.map(p => t('{n} extra {price}', { n: p.extra, price: money(p.amount) })).join(' · ')}</span>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED }}>{t('Your own profile is included. For a partner, a parent or friends, pick a monthly pack of {list} extra profiles, and switch whenever you need more room.', { list: catalog.profilePacks.map(p => p.extra).join(', ') })}{status && status.entitled ? <> <Link to="/billing">{t('Choose a pack')}</Link>.</> : ''}</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 14, borderTop: `1px solid ${INK}` }}>
               <span style={eyebrow}>{t('More minutes')}</span>
-              <span style={{ fontFamily: SERIF, fontSize: 22 }}>{catalog.minutePacks.map(p => `${p.minutes} min ${euros(p.amount)}`).join(' · ')}</span>
+              <span style={{ fontFamily: SERIF, fontSize: 22 }}>{catalog.minutePacks.map(p => `${p.minutes} min ${money(p.amount)}`).join(' · ')}</span>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: MUTED }}>{t('Top up whenever you like, as often as you like. Bought minutes never expire.')}{status && status.entitled ? <> <Link to="/billing">{t('Top up now')}</Link>.</> : ''}</p>
             </div>
           </section>

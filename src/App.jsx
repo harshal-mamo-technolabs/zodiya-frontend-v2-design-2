@@ -21,6 +21,7 @@ import Plans from './pages/Plans.jsx';
 import Checkout from './pages/Checkout.jsx';
 import Billing from './pages/Billing.jsx';
 import Support from './pages/Support.jsx';
+import Legal from './pages/Legal.jsx';
 import { getStatus, useSales } from './lib/billing.js';
 import { getLang } from './i18n/index.js';
 
@@ -126,6 +127,10 @@ export default function App() {
       <Route path="/checkout" element={<ForSale><Checkout /></ForSale>} />
       <Route path="/billing" element={<ForSale><Billing /></ForSale>} />
       <Route path="/support" element={<Support />} />
+      <Route path="/privacy" element={<Legal doc="privacy" />} />
+      <Route path="/terms" element={<Legal doc="terms" />} />
+      <Route path="/refund" element={<Legal doc="refund" />} />
+      <Route path="/faq" element={<Legal doc="faq" />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     {/* follows the reader across every signed-in page */}

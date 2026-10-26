@@ -6,8 +6,9 @@ import { locale, t } from '../i18n/index.js';
 /* Prices, plans and the publishable key all come from the API, so the
    amounts on screen are the amounts Stripe charges. */
 let catalog = null;
+let currency = null;
 export const getCatalog = () => {
-  catalog = catalog || billingCatalog().catch(e => { catalog = null; throw e; });
+  catalog = catalog || billingCatalog().then(c => { currency = c.currency; return c; }).catch(e => { catalog = null; throw e; });
   return catalog;
 };
 
@@ -21,7 +22,7 @@ export function useSales() {
 
 let stripe = null;
 export const getStripe = () => {
-  stripe = stripe || getCatalog().then(c => loadStripe(c.publishableKey));
+  stripe = stripe || getCatalog().then(c => loadStripe(c.publishableKey, { developerTools: { assistant: { enabled: false } } }));
   return stripe;
 };
 
@@ -35,9 +36,16 @@ export const forgetStatus = () => { status = null; };
 // another account signed in or out (lib/api.js): its status is not ours
 window.addEventListener('meridian:session', forgetStatus);
 
-export const euros = cents => {
+/** Cents in the catalog's currency (or `cur`, e.g. a receipt's own). */
+export const money = (cents, cur = currency) => {
   const v = cents / 100, d = Number.isInteger(v) ? 0 : 2;
-  return new Intl.NumberFormat(locale(), { style: 'currency', currency: 'EUR', minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
+  return new Intl.NumberFormat(locale(), { ...(cur && { style: 'currency', currency: cur.toUpperCase() }), minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
+};
+
+/** The cheapest plan and the trial, for a teaser line; null until the catalog is in. */
+export const fromPrices = c => {
+  if (!c || !c.plans.length) return null;
+  return { price: money(Math.min(...c.plans.map(p => p.amount))), trial: c.trial && money(c.trial.amount), days: c.trial && c.trial.days };
 };
 
 export const minutesText = seconds => {
@@ -48,6 +56,10 @@ export const minutesText = seconds => {
 /** Lifetime edits per profile, as the API enforces them. */
 export const EDIT_LIMITS = { primary: 3, extra: 1 };
 export const editsText = n => (n === 0 ? t('No edits left') : t(n === 1 ? '{n} edit left' : '{n} edits left', { n }));
+
+/** Palm readings: a count of them, and how many are left. */
+export const palmReadings = n => t(n === 1 ? '{n} palm reading' : '{n} palm readings', { n });
+export const readingsLeft = n => t(n === 1 ? '{n} reading left' : '{n} readings left', { n });
 
 export const packName = p => t(p.extra === 1 ? '{n} extra profile' : '{n} extra profiles', { n: p.extra });
 

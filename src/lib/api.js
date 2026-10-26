@@ -39,7 +39,7 @@ const refreshSession = () => {
   return refreshing;
 };
 
-async function call(path, { method = 'GET', body, signal, retried = false } = {}) {
+async function call(path, { method = 'GET', body, signal, retried = false, blob = false } = {}) {
   let res;
   try {
     res = await fetch(BASE + path, {
@@ -56,7 +56,13 @@ async function call(path, { method = 'GET', body, signal, retried = false } = {}
   }
 
   if (res.status === 401 && !retried && !NO_REFRESH.some(p => path.startsWith(p))) {
-    if (await refreshSession()) return call(path, { method, body, signal, retried: true });
+    if (await refreshSession()) return call(path, { method, body, signal, retried: true, blob });
+  }
+
+  // a file: the response itself, named as the server names it
+  if (blob && res.ok) {
+    const name = /filename="?([^";]+)/.exec(res.headers.get('Content-Disposition') || '');
+    return { blob: await res.blob(), name: name ? name[1] : 'download' };
   }
 
   const text = await res.text();
@@ -104,6 +110,7 @@ export const updateProfile = (id, body) => call(`/profiles/${id}`, { method: 'PA
 export const setProfileDisabled = (id, disabled) => call(`/profiles/${id}/disabled`, { method: 'PATCH', body: { disabled } });
 export const saveBirthName = (id, birthName) => updateProfile(id, { birthName });
 export const getChart = (id, lang = getLang()) => call(`/profiles/${id}/chart?lang=${lang}`);
+export const chartPdf = (id, lang = getLang()) => call(`/profiles/${id}/chart/pdf?lang=${lang}`, { blob: true });
 export const getHoroscope = ({ sign, period = 'daily', date, tz, lang = getLang() }) => call(`/horoscope?${new URLSearchParams({ sign, period, date, tz, lang })}`);
 export const getSynastry = (id, otherId, lang = getLang()) => call(`/profiles/${id}/synastry/${otherId}?lang=${lang}`);
 export const getTransits = (id, lang = getLang()) => call(`/profiles/${id}/transits?lang=${lang}`);
@@ -121,6 +128,7 @@ export const highlightReading = id => call(`/palm/readings/${id}/highlight`, { m
 export const listPalmReadings = ({ before } = {}) => call(`/palm/readings?${new URLSearchParams(before ? { limit: 20, before } : { limit: 20 })}`);
 export const getPalmReading = id => call(`/palm/readings/${id}`);
 export const deletePalmReading = id => call(`/palm/readings/${id}`, { method: 'DELETE' });
+export const palmReadingPdf = id => call(`/palm/readings/${id}/pdf`, { blob: true });
 export const drawTarot = (spread, lang = getLang()) => call(`/tarot/draw?lang=${lang}`, { method: 'POST', body: { spread } });
 
 export const searchPlaces = (q, signal) => call(`/places?q=${encodeURIComponent(q)}`, { signal });
@@ -141,6 +149,7 @@ export const cancelPlan = () => call('/billing/plan/cancel', { method: 'POST' })
 export const resumePlan = () => call('/billing/plan/resume', { method: 'POST' });
 export const chooseProfilePack = pack => call('/billing/profiles', { method: 'POST', body: { pack } });
 export const buyMinutes = (pack, quantity = 1) => call('/billing/minutes', { method: 'POST', body: { pack, quantity } });
+export const buyPalm = (pack, quantity = 1) => call('/billing/palm', { method: 'POST', body: { pack, quantity } });
 export const payOpenInvoice = kind => call('/billing/pay-open', { method: 'POST', body: { kind } });
 export const getCard = () => call('/billing/card');
 export const startCardSetup = () => call('/billing/card', { method: 'POST' });

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import Starfield from '../components/Starfield.jsx';
-import { buyMinutes, chooseProfilePack, changePlan, getCard, payOpenInvoice, saveCard, startCardSetup, subscribe } from '../lib/api.js';
-import { appearance, euros, every, fonts, forgetStatus, getCatalog, getStatus, getStripe, longDate, packName, settle } from '../lib/billing.js';
+import { buyMinutes, buyPalm, chooseProfilePack, changePlan, getCard, payOpenInvoice, saveCard, startCardSetup, subscribe } from '../lib/api.js';
+import { appearance, money, every, fonts, forgetStatus, getCatalog, getStatus, getStripe, longDate, packName, palmReadings, settle } from '../lib/billing.js';
 import { getLang, t } from '../i18n/index.js';
 
 /* Every payment in the app happens here, on our own page with Stripe
@@ -12,6 +12,7 @@ import { getLang, t } from '../i18n/index.js';
 
      ?item=plan&plan=starter[&trial=1]   ?item=change&plan=gold
      ?item=profiles&pack=profiles_3      ?item=minutes&pack=pack_10&qty=2
+     ?item=palm&pack=palm_3[&qty=1]
      ?item=invoice&kind=plan|profiles    ?item=card
    plus an optional &next=/path for where to go afterwards. */
 
@@ -31,14 +32,14 @@ function describe(q, catalog, status) {
   if ((item === 'plan' || item === 'change') && plan) {
     const trial = item === 'plan' && q.get('trial') === '1' && plan.tier === catalog.trial.tier;
     const lines = trial
-      ? [[t('{days}-day trial', { days: catalog.trial.days }), euros(catalog.trial.amount)], [t('Then {plan}, {every}', { plan: plan.name, every: every(plan.months) }), euros(plan.amount)]]
-      : [[t('{plan}, {every}', { plan: plan.name, every: every(plan.months) }), euros(plan.amount)]];
+      ? [[t('{days}-day trial', { days: catalog.trial.days }), money(catalog.trial.amount)], [t('Then {plan}, {every}', { plan: plan.name, every: every(plan.months) }), money(plan.amount)]]
+      : [[t('{plan}, {every}', { plan: plan.name, every: every(plan.months) }), money(plan.amount)]];
     return item === 'plan' ? {
       title: trial ? t('Try {plan} for {days} days.', { plan: plan.name, days: catalog.trial.days }) : t('{plan}, {every}.', { plan: plan.name, every: every(plan.months) }),
       lines, dueToday: trial ? catalog.trial.amount : plan.amount,
       notes: trial
-        ? [t('{minutes} astrologer minutes during the trial.', { minutes: catalog.trial.minutes }), t('After {days} days {plan} starts at {price} a month on the same card, unless you cancel first.', { days: catalog.trial.days, plan: plan.name, price: euros(plan.amount) })]
-        : [t('{minutes} astrologer minutes {every}.', { minutes: plan.minutes, every: every(plan.months) }), t('Renews automatically. Cancel any time from the billing page.')],
+        ? [t('{minutes} astrologer minutes during the trial.', { minutes: catalog.trial.minutes }), catalog.trial.palm != null && t('{readings} during the trial.', { readings: palmReadings(catalog.trial.palm) }), t('After {days} days {plan} renews at {price} {every} on the same card, unless you cancel first.', { days: catalog.trial.days, plan: plan.name, price: money(plan.amount), every: every(plan.months) })]
+        : [t('{minutes} astrologer minutes {every}.', { minutes: plan.minutes, every: every(plan.months) }), plan.palm != null && t('{readings} {every}.', { readings: palmReadings(plan.palm), every: every(plan.months) }), t('Renews automatically. Cancel any time from the billing page.')],
       start: () => subscribe(plan.tier, trial),
       done: s => s.entitled,
       // the dashboard sends a new account on to its birth details
@@ -73,14 +74,14 @@ function describe(q, catalog, status) {
         title: same ? t('You already have {pack}.', { pack: packName(pack) }) : current ? t(up ? 'Upgrade to {pack}.' : 'Downgrade to {pack}.', { pack: packName(pack) }) : t('{pack}, every month.', { pack: packName(pack) }),
         same,
         slots: status && { used, roomNow, roomNew, canAdd },
-        lines: same ? [] : [[current ? t('{from} → {to} a month', { from: euros(current.amount), to: euros(pack.amount) }) : t('Every month'), euros(pack.amount)]],
+        lines: same ? [] : [[current ? t('{from} → {to} a month', { from: money(current.amount), to: money(pack.amount) }) : t('Every month'), money(pack.amount)]],
         dueToday: same ? null : current ? (prorated > 0 ? prorated : null) : pack.amount,
         dueLabel: current && prorated > 0 ? t('About, today') : null,
         // what every bill after today costs, so the prorated figure is not read as the new price
-        then: same ? null : [end && current ? t('From {date}', { date: longDate(end) }) : t('Then every month'), t('{price} / month', { price: euros(pack.amount) })],
+        then: same ? null : [end && current ? t('From {date}', { date: longDate(end) }) : t('Then every month'), t('{price} / month', { price: money(pack.amount) })],
         notes: same ? [] : [
           current && end
-            ? (prorated > 0 ? t("Today's amount is a one-off for the days left until {date}. From then on you pay the full {price} every month.", { date: longDate(end), price: euros(pack.amount) }) : t('About {credit} unused is credited to your {date} invoice. From then on you pay {price} every month.', { credit: euros(Math.abs(prorated || 0)), date: longDate(end), price: euros(pack.amount) }))
+            ? (prorated > 0 ? t("Today's amount is a one-off for the days left until {date}. From then on you pay the full {price} every month.", { date: longDate(end), price: money(pack.amount) }) : t('About {credit} unused is credited to your {date} invoice. From then on you pay {price} every month.', { credit: money(Math.abs(prorated || 0)), date: longDate(end), price: money(pack.amount) }))
             : current ? t('The difference is charged or credited today; your renewal date stays the same.') : t('Renews every month and ends with your plan.'),
           t('Saved people cannot be deleted, only switched off.')
         ],
@@ -96,11 +97,24 @@ function describe(q, catalog, status) {
     const qty = Math.min(catalog.maxPackQuantity, Math.max(1, parseInt(q.get('qty'), 10) || 1));
     if (pack) return {
       title: t('{n} more minutes with your astrologer.', { n: pack.minutes * qty }),
-      lines: [[t('{qty} × {n}-minute pack', { qty, n: pack.minutes }), euros(pack.amount * qty)]], dueToday: pack.amount * qty,
+      lines: [[t('{qty} × {n}-minute pack', { qty, n: pack.minutes }), money(pack.amount * qty)]], dueToday: pack.amount * qty,
       notes: [t('Paid once. Top-up minutes never expire and are used after your plan minutes.')],
       start: () => buyMinutes(pack.id, qty),
       done: () => true,
       next: '/billing',
+      cta: t('Continue to payment')
+    };
+  }
+  if (item === 'palm') {
+    const pack = (catalog.palmPacks || []).find(p => p.id === q.get('pack'));
+    const qty = Math.min(catalog.maxPackQuantity, Math.max(1, parseInt(q.get('qty'), 10) || 1));
+    if (pack) return {
+      title: t('{n} more palm readings.', { n: pack.readings * qty }),
+      lines: [[qty === 1 ? palmReadings(pack.readings) : t('{qty} × {readings}', { qty, readings: palmReadings(pack.readings) }), money(pack.amount * qty)]], dueToday: pack.amount * qty,
+      notes: [t('Paid once. Bought readings never expire and are used after the ones in your plan.')],
+      start: () => buyPalm(pack.id, qty),
+      done: () => true,
+      next: '/palm-reading',
       cta: t('Continue to payment')
     };
   }
@@ -221,7 +235,7 @@ export default function Checkout() {
                 ))}
                 {(intent && intent.amount != null ? intent.amount : order.dueToday) != null && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '12px 0', fontFamily: MONO, fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase' }}>
-                    <span>{intent && intent.amount != null ? t('Due today') : order.dueLabel || t('Due today')}</span><span style={{ color: GOLD, fontSize: 15 }}>{euros(intent && intent.amount != null ? intent.amount : order.dueToday)}</span>
+                    <span>{intent && intent.amount != null ? t('Due today') : order.dueLabel || t('Due today')}</span><span style={{ color: GOLD, fontSize: 15 }}>{money(intent && intent.amount != null ? intent.amount : order.dueToday)}</span>
                   </div>
                 )}
                 {order.then && (
@@ -232,7 +246,7 @@ export default function Checkout() {
               </div>
             )}
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {order.notes.map(n => <li key={n} style={{ display: 'flex', gap: 10, fontSize: 14, lineHeight: 1.5, color: MUTED }}><span style={{ fontFamily: MONO, color: SAGE }}>·</span><span>{n}</span></li>)}
+              {order.notes.filter(Boolean).map(n => <li key={n} style={{ display: 'flex', gap: 10, fontSize: 14, lineHeight: 1.5, color: MUTED }}><span style={{ fontFamily: MONO, color: SAGE }}>·</span><span>{n}</span></li>)}
             </ul>
           </section>
 
@@ -346,7 +360,7 @@ function PayForm({ clientSecret, setup, savedCard, amount, onPaid, onSaved, onEr
         <PaymentElement onReady={() => setReady(true)} options={{ layout: 'tabs', wallets: { applePay: 'never', googlePay: 'never', link: 'never' } }} />
       </div>
       <button type="button" onClick={pay} disabled={!can} className="hov-cream" style={cta(can)}>
-        <span>{busy ? t('Processing…') : setup ? t('Save card') : t('Pay {price}', { price: euros(amount) })}</span>
+        <span>{busy ? t('Processing…') : setup ? t('Save card') : t('Pay {price}', { price: money(amount) })}</span>
         <span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>→</span>
       </button>
     </div>

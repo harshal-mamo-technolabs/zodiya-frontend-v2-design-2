@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
-import { getChart, getSharedChart, listProfiles, shareProfile } from '../lib/api.js';
+import { chartPdf, getChart, getSharedChart, listProfiles, shareProfile } from '../lib/api.js';
 import { toChartView, SIGNS, SIGN_GLYPH } from '../lib/chart-view.js';
 import { t } from '../i18n/index.js';
 
@@ -107,6 +107,7 @@ function ChartView({ chart, shared }) {
   const [open, setOpen] = useState({ personality: true });
   const [tableOpen, setTableOpen] = useState(false);
   const [notice, setNotice] = useState('');
+  const [saving, setSaving] = useState(false);
   const timer = useRef();
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -142,8 +143,21 @@ function ChartView({ chart, shared }) {
     }
   };
 
-  /* The browser's own print-to-PDF: vector wheel, selectable text, no library. */
-  const download = () => window.print();
+  /* The server renders the PDF in the site's own night-sky look. */
+  const download = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const { blob, name } = await chartPdf(chart.profile.id);
+      const url = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      flash(t("The chart couldn't be downloaded. Try again in a moment."));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const secs = chart.reading.sections;
   const R = b => (b && b.retro ? ' ℞' : '');
@@ -161,11 +175,11 @@ function ChartView({ chart, shared }) {
   const actionBtn = { flex: '1 1 200px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52, padding: '0 18px 0 22px', borderRadius: 2, cursor: 'pointer', fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 15 };
 
   return (
-    <div className="chart-root" style={{ minHeight: '100vh', background: '#1C2538', color: '#F4ECDC', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-      <div className="starfield-layer" style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}><Starfield /></div>
-      <div className="starfield-layer" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.42)' }} />
+    <div style={{ minHeight: '100vh', background: '#1C2538', color: '#F4ECDC', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}><Starfield /></div>
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'rgba(28,37,56,.42)' }} />
 
-      <header className="print-hide" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
+      <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         {shared &&
           <Link to="/signup" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: 'none' }}>{t('Draw your own →')}</Link>}
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
@@ -176,7 +190,7 @@ function ChartView({ chart, shared }) {
       </header>
 
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '0 0 56px' }}>
-        <div className="print-plate">
+        <div>
           <section style={{ padding: '20px 12px 0' }}>
             <div style={{ width: '100%', aspectRatio: '1/1', maxWidth: 620, margin: '0 auto' }}><Wheel chart={chart} name={name} /></div>
           </section>
@@ -196,10 +210,10 @@ function ChartView({ chart, shared }) {
           </section>
         </div>
 
-        <section className="print-reading" style={{ ...column, padding: '36px 24px 0', display: 'flex', flexDirection: 'column' }}>
+        <section style={{ ...column, padding: '36px 24px 0', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, borderBottom: '1px solid #F4ECDC', paddingBottom: 10 }}>
             <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 26 }}>{t('The reading')}</h2>
-            <button type="button" className="hov-sage print-hide" onClick={() => { const next = {}; if (!allOpen) secs.forEach(s => next[s.key] = true); setOpen(next); }} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)' }}>{allOpen ? t('Collapse all') : t('Expand all')}</button>
+            <button type="button" className="hov-sage" onClick={() => { const next = {}; if (!allOpen) secs.forEach(s => next[s.key] = true); setOpen(next); }} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: MUTED, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)' }}>{allOpen ? t('Collapse all') : t('Expand all')}</button>
           </div>
           {secs.map(s => (
             <div key={s.key} style={{ borderBottom: '1px solid rgba(244,236,220,.25)' }}>
@@ -207,24 +221,23 @@ function ChartView({ chart, shared }) {
                 <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', color: COP, flex: '0 0 auto', width: 22 }}>{s.n}</span>
                 <span style={{ flex: 1, fontFamily: SERIF, fontSize: 25, lineHeight: 1.1 }}>{s.title}</span>
                 <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', color: MUTED, flex: '0 0 auto' }}>{s.meta}</span>
-                <span className="print-hide" style={{ fontFamily: MONO, fontSize: 15, color: MUTED, flex: '0 0 auto', width: 12, textAlign: 'center' }}>{open[s.key] ? '−' : '+'}</span>
+                <span style={{ fontFamily: MONO, fontSize: 15, color: MUTED, flex: '0 0 auto', width: 12, textAlign: 'center' }}>{open[s.key] ? '−' : '+'}</span>
               </button>
-              {/* kept in the DOM rather than unmounted, so printing can reveal it */}
-              <div className="reading-body" style={{ display: open[s.key] ? 'flex' : 'none', padding: '0 0 22px', flexDirection: 'column', gap: 14 }}>
-                <div className="reading-basis" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: COP, borderLeft: '1px solid #B4933F', paddingLeft: 12 }}>{s.basis}</div>
+              <div style={{ display: open[s.key] ? 'flex' : 'none', padding: '0 0 22px', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: COP, borderLeft: '1px solid #B4933F', paddingLeft: 12 }}>{s.basis}</div>
                 {s.paras.map((para, i) => <p key={i} style={{ margin: 0, fontSize: 16.5, lineHeight: 1.62, color: '#F4ECDC', textWrap: 'pretty' }}>{para}</p>)}
               </div>
             </div>
           ))}
         </section>
 
-        <section className="print-table" style={{ ...column, padding: '32px 24px 0' }}>
+        <section style={{ ...column, padding: '32px 24px 0' }}>
           <div style={{ border: '1px solid rgba(244,236,220,.3)', background: 'rgba(244,236,220,.08)' }}>
             <button type="button" onClick={() => setTableOpen(v => !v)} className="hov-sage" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, width: '100%', background: 'transparent', border: 'none', padding: '15px 16px', cursor: 'pointer', textAlign: 'left', color: '#F4ECDC', fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase' }}>
               <span>{t('Exact placements · Tropical · {system}', { system: t(chart.meta.houseSystem) })}</span>
-              <span className="print-hide" style={{ fontSize: 14, color: MUTED }}>{tableOpen ? '−' : '+'}</span>
+              <span style={{ fontSize: 14, color: MUTED }}>{tableOpen ? '−' : '+'}</span>
             </button>
-            <div className="table-body" style={{ display: tableOpen ? 'block' : 'none', overflowX: 'auto', borderTop: '1px solid rgba(244,236,220,.3)' }}>
+            <div style={{ display: tableOpen ? 'block' : 'none', overflowX: 'auto', borderTop: '1px solid rgba(244,236,220,.3)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: MONO, fontSize: 12, minWidth: 340 }}>
                 <thead>
                   <tr style={{ textAlign: 'left', color: MUTED, fontSize: 9.5, letterSpacing: '.14em', textTransform: 'uppercase' }}>
@@ -252,16 +265,18 @@ function ChartView({ chart, shared }) {
           </div>
         </section>
 
-        <section className="print-hide" style={{ ...column, padding: '28px 24px 0' }}>
+        <section style={{ ...column, padding: '28px 24px 0' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             <button type="button" onClick={share} className="hov-cream" style={{ ...actionBtn, background: '#F4ECDC', color: '#1C2538', border: 'none' }}>
               <span>{shared ? t('Copy this link') : t('Share this chart')}</span>
               <span style={{ fontFamily: MONO, fontSize: 13, opacity: .8 }}>↗</span>
             </button>
-            <button type="button" onClick={download} className="hov-wash-cream" style={{ ...actionBtn, background: 'transparent', color: '#F4ECDC', border: '1px solid #F4ECDC' }}>
-              <span>{t('Download as plate')}</span>
-              <span style={{ fontFamily: MONO, fontSize: 13, color: MUTED }}>PDF</span>
-            </button>
+            {/* a share link has no session to fetch the PDF with */}
+            {!shared &&
+              <button type="button" onClick={download} disabled={saving} aria-busy={saving} className="hov-wash-cream" style={{ ...actionBtn, background: 'transparent', color: '#F4ECDC', border: '1px solid #F4ECDC', cursor: saving ? 'progress' : 'pointer', opacity: saving ? .7 : 1 }}>
+                <span>{saving ? t('Preparing PDF…') : t('Download PDF')}</span>
+                <span style={{ fontFamily: MONO, fontSize: 13, color: MUTED }}>↓</span>
+              </button>}
           </div>
           <div aria-live="polite" style={{ minHeight: 20, marginTop: 10, fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: COP, wordBreak: 'break-all' }}>{notice}</div>
           <p style={{ margin: '2px 0 0', fontSize: 12.5, lineHeight: 1.5, color: MUTED, maxWidth: 560 }}>
