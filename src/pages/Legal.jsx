@@ -1,8 +1,10 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
-import { getLang } from '../i18n/index.js';
+import LanguageSwitch from '../components/LanguageSwitch.jsx';
+import { getMe } from '../lib/api.js';
+import { getLang, t } from '../i18n/index.js';
 import CONTENT from './legal-content.js';
 
 const MONO = "'IBM Plex Mono',monospace";
@@ -39,6 +41,13 @@ const MENU = { privacy: 'Privacy Policy', terms: 'Terms of Use', refund: 'Refund
 export default function Legal({ doc }) {
   const c = CONTENT[doc][getLang()] || CONTENT[doc].en;
   const p = { margin: 0 };
+  // these pages are public: the profile menu only means something once signed in
+  const [signedIn, setSignedIn] = useState(null);
+  useEffect(() => {
+    let live = true;
+    getMe().then(() => { if (live) setSignedIn(true); }).catch(() => { if (live) setSignedIn(false); });
+    return () => { live = false; };
+  }, []);
 
   return (
     <div style={{ minHeight: '100vh', background: '#1C2538', color: '#F4ECDC', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
@@ -47,7 +56,13 @@ export default function Legal({ doc }) {
 
       <header style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 24px', borderBottom: '1px solid rgba(244,236,220,.2)', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
         <Link to="/" className="hdr-logo" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 18, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: 'none' }}>AstroMeridian</Link>
-        <NavMenu current={MENU[doc]} />
+        {signedIn && <NavMenu current={MENU[doc]} />}
+        {signedIn === false && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <LanguageSwitch />
+            <Link to="/login" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.35)', paddingBottom: 2, whiteSpace: 'nowrap' }}>{t('Sign in')}</Link>
+          </div>
+        )}
       </header>
 
       <main style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 760, margin: '0 auto', padding: '40px 24px 64px', display: 'flex', flexDirection: 'column', gap: 28, fontSize: 15.5, lineHeight: 1.65, color: MUTED }}>

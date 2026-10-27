@@ -33,7 +33,7 @@ export default {
   "Plans from {price} · Try {days} days for {trial}": "Tarife ab {price} · {days} Tage testen für {trial}",
   "Plans from {price}": "Tarife ab {price}",
   "You were born under a sky no one else has ever seen.": "Du bist unter einem Himmel geboren, den niemand sonst je gesehen hat.",
-  "Enter your birth date, time and place. We plot the heavens exactly as they stood in that minute, then explain what they mean, in plain English.": "Gib Geburtsdatum, Uhrzeit und Ort ein. Wir zeichnen den Himmel genau so, wie er in dieser Minute stand, und erklären dir in einfachen Worten, was er bedeutet.",
+  "Enter your birth date, time and place. Discover the patterns of your birth chart and explore what makes your cosmic story unique.": "Gib Geburtsdatum, Uhrzeit und Ort ein. Entdecke die Muster deines Geburtshoroskops und finde heraus, was deine kosmische Geschichte einzigartig macht.",
   "Get your birth chart": "Dein Geburtshoroskop erstellen",
   "Takes about a minute": "Dauert etwa eine Minute",
   "14 MAR 1994": "14. MÄR 1994",

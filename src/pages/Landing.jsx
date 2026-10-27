@@ -127,7 +127,7 @@ export default function Landing() {
           </div>
           )}
           <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(38px,9vw,64px)', lineHeight: 1.04, letterSpacing: '-.01em', maxWidth: 680, textWrap: 'balance' }}>{t('You were born under a sky no one else has ever seen.')}</h1>
-          <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, color: MUTED, maxWidth: 460, textWrap: 'pretty' }}>{t('Enter your birth date, time and place. We plot the heavens exactly as they stood in that minute, then explain what they mean, in plain English.')}</p>
+          <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, color: MUTED, maxWidth: 460, textWrap: 'pretty' }}>{t('Enter your birth date, time and place. Discover the patterns of your birth chart and explore what makes your cosmic story unique.')}</p>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, width: '100%', maxWidth: 360, marginTop: 4 }}>
             <Link to="/signup" className="ld-cta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 54, padding: '0 20px 0 24px', background: INK, color: NAVY, border: 'none', borderBottom: 'none', borderRadius: 2, fontFamily: "'Instrument Sans',sans-serif", fontWeight: 500, fontSize: 16, letterSpacing: '.01em' }}>
               <span>{t('Get your birth chart')}</span>
@@ -196,17 +196,13 @@ export default function Landing() {
               <span style={{ fontSize: 13, lineHeight: 1.5, color: 'rgba(28,37,56,.7)' }}>{t('Planetary positions computed to the arc-minute. Written by people, checked against the ephemeris.')}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(120px,auto))', gap: '10px 40px', fontSize: 13 }}>
-              {[['Birth chart', '/natal-chart'], ['Synastry', '/synastry'], ['Transits', '/transits'], ['Daily horoscope', '/daily-horoscope'], ['Tarot', '/tarot'], ['Numerology', '/numerology'], ['Astrocartography', '/astrocartography'], ['Palm reading', '/palm-reading'], ['Pricing', '/subscription'], ['Sign in', '/login']].map(([label, to]) => (
+              {[['Birth chart', '/natal-chart'], ['Synastry', '/synastry'], ['Transits', '/transits'], ['Daily horoscope', '/daily-horoscope'], ['Tarot', '/tarot'], ['Numerology', '/numerology'], ['Astrocartography', '/astrocartography'], ['Palm reading', '/palm-reading'], ['Pricing', '/subscription'], ['Sign in', '/login'], ['Privacy Policy', '/privacy'], ['Terms of Use', '/terms']].map(([label, to]) => (
                 <Link key={label} to={to} style={{ color: 'rgba(28,37,56,.85)', borderBottom: 'none' }}>{t(label)}</Link>
               ))}
             </div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '8px 20px', borderTop: '1px solid rgba(28,37,56,.2)', paddingTop: 16, fontFamily: MONO, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(28,37,56,.6)' }}>
             <span>© MMXXVI AstroMeridian</span>
-            <span style={{ display: 'flex', gap: 20 }}>
-              <Link to="/privacy" style={{ color: 'inherit', borderBottom: 'none' }}>{t('Privacy Policy')}</Link>
-              <Link to="/terms" style={{ color: 'inherit', borderBottom: 'none' }}>{t('Terms of Use')}</Link>
-            </span>
             <span>{t('For reflection, not prediction')}</span>
           </div>
         </div>
