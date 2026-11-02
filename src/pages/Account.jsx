@@ -120,6 +120,9 @@ export default function Account() {
   const sales = useSales();
   // payments off: no slots, just a count
   const slots = billing && billing.paymentsEnabled !== false ? billing.profiles.included + billing.profiles.extra : null;
+  // a closed account must never be charged, so anything renewing is cancelled first
+  const renewing = billing && billing.paymentsEnabled !== false && billing.entitled &&
+    (!billing.plan.cancelAtPeriodEnd || (billing.profiles.extra > 0 && !billing.profiles.cancelAtPeriodEnd));
 
   const save = async () => {
     if (!dirty || !valid || !own || locked) return;
@@ -303,11 +306,28 @@ export default function Account() {
               </div>
               {deleteOpen && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 14, borderTop: '1px solid rgba(244,236,220,.18)', animation: 'om-fade .25s ease both' }}>
-                  <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.72)', textWrap: 'pretty' }}>{t('This cancels your plan straight away and removes your account, your chart and everyone you have saved. There is no refund and no undo. Export your data first if you want to keep it.')}</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                    <button type="button" onClick={deleteAccount} disabled={busy} style={{ border: '1px solid rgba(196,106,90,.7)', background: 'transparent', color: RED, padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>{busy ? t('Deleting') : t('Confirm deletion')}</button>
-                    <button type="button" onClick={() => setDeleteOpen(false)} className="acc-quiet" style={{ ...quiet, color: 'rgba(244,236,220,.55)', padding: '9px 4px', fontSize: 10, letterSpacing: '.14em' }}>{t('Keep it')}</button>
-                  </div>
+                  {renewing ? (
+                    <>
+                      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.72)', textWrap: 'pretty' }}>{t("You can't delete your account while a plan still renews. Cancel your plan and profile pack first.")}</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                        <Link to="/billing" style={{ border: '1px solid rgba(244,236,220,.3)', color: INK, padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', borderBottom: '1px solid rgba(244,236,220,.3)' }}>{t('Cancel my plans')}</Link>
+                        <button type="button" onClick={() => setDeleteOpen(false)} className="acc-quiet" style={{ ...quiet, color: 'rgba(244,236,220,.55)', padding: '9px 4px', fontSize: 10, letterSpacing: '.14em' }}>{t('Go back')}</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.72)', textWrap: 'pretty' }}>{t('By deleting your account, you agree to the following:')}</p>
+                      <ul style={{ margin: 0, padding: '0 0 0 18px', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13.5, lineHeight: 1.5, color: 'rgba(244,236,220,.72)' }}>
+                        <li>{t('You are signed out everywhere and lose access to your account.')}</li>
+                        <li>{t('Your chart, saved people and readings are kept. Logging in again with this email reopens your account.')}</li>
+                        <li>{t('Nothing more is charged. A cancelled plan is not refunded.')}</li>
+                      </ul>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                        <button type="button" onClick={deleteAccount} disabled={busy} style={{ border: '1px solid rgba(196,106,90,.7)', background: 'transparent', color: RED, padding: '9px 18px', fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>{busy ? t('Deleting') : t('Delete my account')}</button>
+                        <button type="button" onClick={() => setDeleteOpen(false)} className="acc-quiet" style={{ ...quiet, color: 'rgba(244,236,220,.55)', padding: '9px 4px', fontSize: 10, letterSpacing: '.14em' }}>{t('Keep it')}</button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </section>

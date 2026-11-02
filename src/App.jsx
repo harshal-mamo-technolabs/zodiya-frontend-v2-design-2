@@ -17,6 +17,7 @@ import Horoscope from './pages/Horoscope.jsx';
 import Account from './pages/Account.jsx';
 import ChooseAstrologer from './pages/ChooseAstrologer.jsx';
 import AstrologerWidget from './components/AstrologerWidget.jsx';
+import AccountRestored from './components/AccountRestored.jsx';
 import Plans from './pages/Plans.jsx';
 import Checkout from './pages/Checkout.jsx';
 import Billing from './pages/Billing.jsx';
@@ -135,6 +136,7 @@ export default function App() {
     </Routes>
     {/* follows the reader across every signed-in page */}
     <AstrologerWidget />
+    <AccountRestored />
     </Fragment>
     </>
   );

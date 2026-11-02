@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import Starfield from '../components/Starfield.jsx';
 import NavMenu from '../components/NavMenu.jsx';
-import { cancelPlan, getCard, listReceipts, listProfiles, resumePlan } from '../lib/api.js';
+import { cancelPlan, cancelProfiles, getCard, listReceipts, listProfiles, resumePlan, resumeProfiles } from '../lib/api.js';
 import { EDIT_LIMITS, editsText, money, every, forgetStatus, getCatalog, getStatus, longDate, packName, palmReadings, readingsLeft } from '../lib/billing.js';
 import { getLang, t } from '../i18n/index.js';
 
@@ -18,6 +19,7 @@ const head = { display: 'flex', alignItems: 'baseline', justifyContent: 'space-b
 const row = { display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid rgba(244,236,220,.18)' };
 const action = { flex: '0 0 auto', background: 'transparent', border: '1px solid rgba(244,236,220,.3)', color: INK, padding: '8px 14px', fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 0 };
 const mono10 = { fontFamily: MONO, fontSize: 10, letterSpacing: '.06em', color: MUTED };
+const quiet = { alignSelf: 'flex-start', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.45)' };
 const section = delay => ({ display: 'flex', flexDirection: 'column', animation: `om-rise .45s cubic-bezier(.3,0,.2,1) ${delay}s both` });
 
 const mins = s => Math.floor(s / 60);
@@ -55,10 +57,11 @@ export default function Billing() {
     listProfiles(true).then(setPeople).catch(() => setPeople([]));
   }, [navigate]);
 
-  const toggleCancel = async cancel => {
+  // runs one billing call and shows the status it hands back
+  const act = async call => {
     setBusy(true); setError('');
-    try { forgetStatus(); setStatus(await (cancel ? cancelPlan() : resumePlan())); setConfirmCancel(false); }
-    catch (e) { setError(e.message); }
+    try { forgetStatus(); setStatus(await call()); return true; }
+    catch (e) { setError(e.message); return false; }
     finally { setBusy(false); }
   };
 
@@ -133,21 +136,14 @@ export default function Billing() {
                   {plan.cancelAtPeriodEnd ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
                       <span style={{ fontSize: 13.5, color: MUTED }}>{t('Everything stays open until {date}. Nothing more will be charged.', { date: longDate(plan.currentPeriodEnd) })}</span>
-                      <button type="button" disabled={busy} onClick={() => toggleCancel(false)} className="bl-line" style={action}>{t('Keep my plan')}</button>
-                    </div>
-                  ) : confirmCancel ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'om-fade .25s ease both' }}>
-                      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.75)' }}>{t(status.profiles.extra ? (plan.trial ? 'Your plan and extra profiles will stop renewing. You keep access until {date}, and the trial will not turn into a paid plan.' : 'Your plan and extra profiles will stop renewing. You keep access until {date}.') : (plan.trial ? 'Your plan will stop renewing. You keep access until {date}, and the trial will not turn into a paid plan.' : 'Your plan will stop renewing. You keep access until {date}.'), { date: longDate(plan.currentPeriodEnd) })}</p>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <button type="button" disabled={busy} onClick={() => toggleCancel(true)} style={{ ...action, borderColor: 'rgba(196,106,90,.7)', color: RED }}>{busy ? t('Cancelling') : t('Cancel renewal')}</button>
-                        <button type="button" onClick={() => setConfirmCancel(false)} style={{ ...action, border: 'none', color: MUTED }}>{t('Never mind')}</button>
-                      </div>
+                      <button type="button" disabled={busy} onClick={() => act(resumePlan)} className="bl-line" style={action}>{t('Keep my plan')}</button>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => setConfirmCancel(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: MONO, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(244,236,220,.45)' }}>{t('Cancel plan')}</button>
+                    <button type="button" onClick={() => setConfirmCancel(true)} style={quiet}>{t('Cancel plan')}</button>
                   )}
                 </div>
               )}
+              {confirmCancel && <CancelPlanDialog status={status} busy={busy} error={error} act={act} onClose={() => { setConfirmCancel(false); setError(''); }} />}
             </Card>
 
             {/* --------------------------------------------------- minutes */}
@@ -214,7 +210,7 @@ export default function Billing() {
             )}
 
             {/* -------------------------------------------------- profiles */}
-            <ProfilesSection status={status} catalog={catalog} people={people} />
+            <ProfilesSection status={status} catalog={catalog} people={people} busy={busy} act={act} />
 
             {/* ----------------------------------- payment details, not a product */}
             <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: SAGE, paddingTop: 10 }}>{t('Payment details')}</span>
@@ -258,8 +254,11 @@ const PROFILE_RULES = [
 ];
 
 /* The profile pack, how its slots are used, the way up or down, and the rules behind it. */
-function ProfilesSection({ status, catalog, people }) {
+function ProfilesSection({ status, catalog, people, busy, act }) {
+  const [confirm, setConfirm] = useState(false);
   const p = status.profiles;
+  // a pack cannot outlive the plan, so nothing is sold or kept while it ends
+  const planEnding = status.plan && status.plan.cancelAtPeriodEnd;
   const slots = p.included + p.extra;
   const current = catalog.profilePacks.find(x => x.id === p.pack);
   const extras = people ? people.filter(x => !x.isPrimary) : [];
@@ -300,6 +299,29 @@ function ProfilesSection({ status, catalog, people }) {
         </div>
       )}
 
+      {/* the pack can stop on its own; the plan carries on */}
+      {status.entitled && current && !failed && (
+        <div style={{ ...row, flexWrap: 'wrap' }}>
+          {p.cancelAtPeriodEnd ? (
+            <>
+              <span style={{ flex: 1, fontSize: 13.5, color: MUTED }}>{t('Your profile pack stops renewing. You keep its slots until {date}.', { date: longDate(p.currentPeriodEnd) })}</span>
+              {/* the pack cannot outlive the plan, so keeping it while the plan ends keeps both */}
+              <button type="button" disabled={busy} onClick={() => act(planEnding ? async () => { await resumePlan(); return resumeProfiles(); } : resumeProfiles)} className="bl-line" style={action}>{planEnding ? t('Keep plan and pack') : t('Keep my pack')}</button>
+            </>
+          ) : confirm ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, animation: 'om-fade .25s ease both' }}>
+              <span style={{ fontSize: 13.5, lineHeight: 1.55, color: 'rgba(244,236,220,.75)' }}>{t('Your profile pack will stop renewing. You keep its slots until {date}. Your plan carries on.', { date: longDate(p.currentPeriodEnd) })}</span>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button type="button" disabled={busy} onClick={async () => { if (await act(cancelProfiles)) setConfirm(false); }} style={{ ...action, borderColor: 'rgba(196,106,90,.7)', color: RED }}>{busy ? t('Cancelling') : t('Cancel pack')}</button>
+                <button type="button" onClick={() => setConfirm(false)} style={{ ...action, border: 'none', color: MUTED }}>{t('Never mind')}</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirm(true)} style={quiet}>{t('Cancel profile pack')}</button>
+          )}
+        </div>
+      )}
+
       {/* the way up or down */}
       {catalog.profilePacks.map(pack => {
         const mine = p.pack === pack.id;
@@ -313,7 +335,7 @@ function ProfilesSection({ status, catalog, people }) {
               <span style={mono10}>{mine ? t('Your pack') : !fits ? t('Holds {n} profiles; you have {used}', { n: p.included + pack.extra, used: p.used }) : current ? t(up ? 'Charged the difference today, pro rata' : 'Credited the difference today, pro rata') : t('Room for {n} profiles', { n: p.included + pack.extra })}</span>
             </div>
             {mine ? <span style={{ ...mono10, color: SAGE }}>{t('Current')}</span>
-              : status.entitled && fits && <Link to={`/checkout?item=profiles&pack=${pack.id}`} className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{!current ? t('Choose') : up ? t('Upgrade') : t('Downgrade')}</Link>}
+              : status.entitled && fits && !planEnding && <Link to={`/checkout?item=profiles&pack=${pack.id}`} className="bl-line" style={{ ...action, borderBottom: '1px solid rgba(244,236,220,.3)' }}>{!current ? t('Choose') : up ? t('Upgrade') : t('Downgrade')}</Link>}
           </div>
         );
       })}
@@ -327,6 +349,106 @@ function ProfilesSection({ status, catalog, people }) {
       </details>
       <Link to="/account" style={{ alignSelf: 'flex-start', marginTop: 12, ...mono10, textTransform: 'uppercase', letterSpacing: '.12em', borderBottom: '1px solid rgba(244,236,220,.3)' }}>{t('Manage saved people')}</Link>
     </Card>
+  );
+}
+
+// sent in English whatever the language, so Klaviyo reads one set of answers
+const CANCEL_REASONS = [
+  "I wasn't using it often enough",
+  'Too expensive.',
+  "Didn't find the value worth the cost.",
+  "It didn't meet my needs or expectations.",
+  'Features I needed were unavailable.',
+  'Readings or insights were too basic.',
+  'I encountered technical problems.',
+  'Poor app performance or usability issues.',
+  'Information was repetitive or unhelpful.',
+  'Other'
+];
+const STAY_OPTIONS = ['Lower-cost subscription', 'Annual discounted rates', 'Additional Premium content'];
+
+/* Cancelling the plan: extra profiles go first (they cannot outlive it), then why they are leaving. */
+function CancelPlanDialog({ status, busy, error, act, onClose }) {
+  const [reason, setReason] = useState('');
+  const [other, setOther] = useState('');
+  const [stay, setStay] = useState([]);
+  const plan = status.plan;
+  const profilesFirst = status.profiles.extra > 0 && !status.profiles.cancelAtPeriodEnd;
+  const date = longDate(plan.currentPeriodEnd);
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+
+  const submit = async () => {
+    const survey = { reason: reason === 'Other' ? other.trim() || 'Other' : reason, stayIfOffered: stay };
+    if (await act(() => cancelPlan(survey))) onClose();
+  };
+  const choice = on => ({ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '10px 12px', border: `1px solid ${on ? GOLD : 'rgba(244,236,220,.2)'}`, background: on ? 'rgba(180,147,63,.12)' : 'transparent', color: INK, fontSize: 13.5, lineHeight: 1.35, cursor: 'pointer', font: 'inherit' });
+  const mark = (on, round) => ({ flex: '0 0 auto', width: 12, height: 12, borderRadius: round ? '50%' : 0, border: `1px solid ${on ? GOLD : 'rgba(244,236,220,.4)'}`, background: on ? GOLD : 'transparent' });
+  const label = { fontFamily: MONO, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD };
+
+  // on <body>: the card's rise animation leaves a transform that would trap a fixed overlay inside it
+  return createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(10,14,24,.72)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 16px', overflowY: 'auto', animation: 'om-nav-fade .2s ease both' }}>
+      <div role="dialog" aria-modal="true" aria-label={t('Cancel plan')} onClick={e => e.stopPropagation()} style={{ width: 'min(640px,100%)', background: NAVY, color: INK, border: '1px solid rgba(244,236,220,.2)', boxShadow: '0 24px 60px rgba(0,0,0,.5)', padding: '22px 24px 26px', display: 'flex', flexDirection: 'column', gap: 20, animation: 'om-rise .28s cubic-bezier(.3,0,.2,1) both' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ ...label, color: SAGE }}>{profilesFirst ? t('Step 1 of 2') : t('Before you go')}</span>
+            <h2 style={{ margin: 0, fontFamily: SERIF, fontWeight: 500, fontSize: 'clamp(26px,5vw,32px)', lineHeight: 1.1, textWrap: 'balance' }}>{profilesFirst ? t('Cancel your extra profiles first.') : t('Tell us why you are leaving.')}</h2>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: 'rgba(244,236,220,.68)', textWrap: 'pretty' }}>{profilesFirst
+              ? t('Your profile pack ends with your plan, so it has to stop renewing first. You keep its slots until {date}.', { date: longDate(status.profiles.currentPeriodEnd) })
+              : t(plan.trial ? 'Your plan will stop renewing. You keep access until {date}, and the trial will not turn into a paid plan.' : 'Your plan will stop renewing. You keep access until {date}.', { date })}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label={t('Close')} style={{ width: 28, height: 28, flex: '0 0 auto', background: 'transparent', border: 'none', color: INK, fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: 0 }}>×</button>
+        </div>
+
+        {error && <div role="alert" style={{ borderLeft: `2px solid ${GOLD}`, background: 'rgba(180,147,63,.12)', padding: '10px 14px', fontSize: 14 }}>{error}</div>}
+
+        {profilesFirst ? (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button type="button" disabled={busy} onClick={() => act(cancelProfiles)} style={{ ...action, borderColor: 'rgba(196,106,90,.7)', color: RED }}>{busy ? t('Cancelling') : t('Cancel extra profiles')}</button>
+            <button type="button" onClick={onClose} style={{ ...action, border: 'none', color: MUTED }}>{t('Never mind')}</button>
+          </div>
+        ) : (
+          <>
+            <fieldset style={{ border: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <legend style={{ ...label, padding: 0, marginBottom: 10 }}>{t('Why are you cancelling?')} <span style={{ color: RED }}>*</span></legend>
+              <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+                {CANCEL_REASONS.map(r => (
+                  <button key={r} type="button" role="radio" aria-checked={reason === r} onClick={() => setReason(r)} style={choice(reason === r)}>
+                    <span style={mark(reason === r, true)} /><span>{t(r)}</span>
+                  </button>
+                ))}
+              </div>
+              {reason === 'Other' && <textarea value={other} onChange={e => setOther(e.target.value)} maxLength={500} rows={3} placeholder={t('Please tell us more…')} aria-label={t('Please tell us more…')} style={{ background: 'rgba(17,23,37,.55)', color: INK, border: '1px solid rgba(244,236,220,.3)', padding: '10px 12px', font: 'inherit', fontSize: 14, resize: 'vertical' }} />}
+            </fieldset>
+
+            <fieldset style={{ border: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <legend style={{ ...label, padding: 0, marginBottom: 10 }}>{t('Would you have stayed if we offered:')} <span style={{ color: MUTED, textTransform: 'none', letterSpacing: 0 }}>{t('(optional, pick any)')}</span></legend>
+              {STAY_OPTIONS.map(o => {
+                const on = stay.includes(o);
+                return (
+                  <button key={o} type="button" role="checkbox" aria-checked={on} onClick={() => setStay(on ? stay.filter(x => x !== o) : [...stay, o])} style={choice(on)}>
+                    <span style={mark(on, false)} /><span>{t(o)}</span>
+                  </button>
+                );
+              })}
+            </fieldset>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button type="button" disabled={busy || !reason} onClick={submit} style={{ ...action, borderColor: 'rgba(196,106,90,.7)', color: RED, opacity: reason ? 1 : 0.5, cursor: reason ? 'pointer' : 'not-allowed' }}>{busy ? t('Cancelling') : t('Cancel renewal')}</button>
+              <button type="button" onClick={onClose} style={{ ...action, border: 'none', color: MUTED }}>{t('Keep my plan')}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>,
+    document.body
   );
 }
 

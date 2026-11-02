@@ -91,7 +91,12 @@ const newSession = (alsoForget = []) => {
   window.dispatchEvent(new Event('meridian:session'));
 };
 export const register = body => call('/auth/register', { method: 'POST', body }).then(r => { newSession(['meridian_astrologer']); return r; });
-export const login = body => call('/auth/login', { method: 'POST', body }).then(r => { newSession(); return r; });
+// a deleted account is reopened by its login; AccountRestored explains that once
+export const login = body => call('/auth/login', { method: 'POST', body }).then(r => {
+  if (r && r.restored) { try { sessionStorage.setItem('meridian_restored', r.deletedAt); } catch (e) {} }
+  newSession();
+  return r;
+});
 // the session ends here even if the call fails: the next account must not see this one
 export const logout = () => call('/auth/logout', { method: 'POST' }).finally(() => newSession());
 export const getMe = () => call('/auth/me');
@@ -145,9 +150,12 @@ export const billingStatus = () => call('/billing/status');
 export const billingSync = paymentIntentId => call('/billing/sync', { method: 'POST', body: paymentIntentId ? { paymentIntentId } : {} });
 export const subscribe = (plan, trial = false) => call('/billing/subscribe', { method: 'POST', body: { plan, trial } });
 export const changePlan = plan => call('/billing/plan/change', { method: 'POST', body: { plan } });
-export const cancelPlan = () => call('/billing/plan/cancel', { method: 'POST' });
+// survey: { reason, stayIfOffered: [] }; extra profiles must be cancelled first (409 profiles_active)
+export const cancelPlan = survey => call('/billing/plan/cancel', { method: 'POST', body: survey });
 export const resumePlan = () => call('/billing/plan/resume', { method: 'POST' });
 export const chooseProfilePack = pack => call('/billing/profiles', { method: 'POST', body: { pack } });
+export const cancelProfiles = () => call('/billing/profiles/cancel', { method: 'POST' });
+export const resumeProfiles = () => call('/billing/profiles/resume', { method: 'POST' });
 export const buyMinutes = (pack, quantity = 1) => call('/billing/minutes', { method: 'POST', body: { pack, quantity } });
 export const buyPalm = (pack, quantity = 1) => call('/billing/palm', { method: 'POST', body: { pack, quantity } });
 export const payOpenInvoice = kind => call('/billing/pay-open', { method: 'POST', body: { kind } });
